@@ -18,7 +18,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
-    implementation 'org.neo4j.driver:neo4j-java-driver:5.26.0'
+    implementation 'org.neo4j.driver:neo4j-java-driver:6.3.0'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
