@@ -1,0 +1,1 @@
+package org.neo4j.driver; public final class AuthTokens { public static AuthToken basic(String u,String p){return null;} }

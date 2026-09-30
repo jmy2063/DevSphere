@@ -1,0 +1,1 @@
+package org.springframework.boot; public final class SpringApplication { public static Object run(Class<?> c, String... args){ return null; } }

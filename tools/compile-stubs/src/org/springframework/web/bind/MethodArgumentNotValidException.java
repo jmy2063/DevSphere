@@ -1,0 +1,1 @@
+package org.springframework.web.bind; import org.springframework.validation.BindingResult; public class MethodArgumentNotValidException extends RuntimeException { public BindingResult getBindingResult(){ return new BindingResult(); } }

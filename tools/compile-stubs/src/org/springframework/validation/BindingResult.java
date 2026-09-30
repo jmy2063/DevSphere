@@ -1,0 +1,1 @@
+package org.springframework.validation; import java.util.*; public class BindingResult { public List<FieldError> getFieldErrors(){return List.of();} }

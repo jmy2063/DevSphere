@@ -1,0 +1,27 @@
+# Java / Gradle
+.gradle/
+build/
+**/build/
+*.class
+
+# Node / Vite
+node_modules/
+dist/
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# DevSphere generated
+.verify-build/
+.core-demo-build/
+.report-build/
+.syntax-check/
+demo-output/
+
+# OS
+.DS_Store
+Thumbs.db

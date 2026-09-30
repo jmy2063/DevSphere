@@ -1,0 +1,1 @@
+package org.neo4j.driver; @FunctionalInterface public interface TransactionCallback<T> { T execute(TransactionContext tx); }

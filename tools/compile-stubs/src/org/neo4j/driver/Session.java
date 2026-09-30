@@ -1,0 +1,1 @@
+package org.neo4j.driver; public interface Session extends AutoCloseable { <T> T executeWrite(TransactionCallback<T> c); default void close(){} }

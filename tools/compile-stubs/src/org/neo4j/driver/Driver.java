@@ -1,0 +1,1 @@
+package org.neo4j.driver; public interface Driver extends AutoCloseable { void verifyConnectivity(); Session session(); default void close(){} }

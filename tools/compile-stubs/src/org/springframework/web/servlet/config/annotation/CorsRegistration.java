@@ -1,0 +1,1 @@
+package org.springframework.web.servlet.config.annotation; public class CorsRegistration { public CorsRegistration allowedOrigins(String... x){return this;} public CorsRegistration allowedMethods(String... x){return this;} public CorsRegistration allowedHeaders(String... x){return this;} public CorsRegistration maxAge(long x){return this;} }

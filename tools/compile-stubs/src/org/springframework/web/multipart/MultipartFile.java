@@ -1,0 +1,1 @@
+package org.springframework.web.multipart; import java.io.*; public interface MultipartFile { boolean isEmpty(); long getSize(); String getOriginalFilename(); InputStream getInputStream() throws IOException; }

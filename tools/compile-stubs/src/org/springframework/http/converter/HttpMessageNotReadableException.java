@@ -1,0 +1,1 @@
+package org.springframework.http.converter; public class HttpMessageNotReadableException extends RuntimeException { public HttpMessageNotReadableException(){super();} }

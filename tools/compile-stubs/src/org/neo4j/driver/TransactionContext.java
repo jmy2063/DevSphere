@@ -1,0 +1,1 @@
+package org.neo4j.driver; import java.util.*; public interface TransactionContext { Result run(String q, Map<String,?> p); }

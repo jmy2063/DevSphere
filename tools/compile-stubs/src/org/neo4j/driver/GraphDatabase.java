@@ -1,0 +1,1 @@
+package org.neo4j.driver; public final class GraphDatabase { public static Driver driver(String u,AuthToken t){return null;} }

@@ -1,0 +1,1 @@
+package org.neo4j.driver; public interface Result {}

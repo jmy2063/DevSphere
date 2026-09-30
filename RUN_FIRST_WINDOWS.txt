@@ -1,0 +1,45 @@
+DevSphere AX 4.0 — Windows 첫 실행
+
+1) JDK 17 이상 확인
+   java -version
+   javac -version
+
+2) ZIP 압축 해제 후 최상위 폴더에서
+   verify-core.bat
+
+3) 반드시 아래 문구 확인
+   ALL CORE TESTS PASSED: 62
+
+4) 핵심 분석 데모
+   core-demo.bat
+
+5) Backend
+   IntelliJ -> backend 폴더를 Gradle Project로 Open
+   Gradle Sync -> test -> bootRun
+   http://127.0.0.1:8080/api/health 확인
+
+6) Frontend
+   cd frontend
+   npm install
+   npm run build
+   npm run dev
+
+7) 브라우저 시연
+   sample-spring-project.zip 업로드
+   OrderService.createOrder() 선택
+   3단계 비교 실행
+   SYSTEM 광역 리스크 실행
+   Path / CRI / Evidence 확인
+
+8) GitHub PR 시연
+   owner / repository / PR 번호 입력
+   변경 Method 자동 분석
+
+중요:
+- CRI는 장애 확률이 아니라 상대 변경 위험지수입니다.
+- SYSTEM은 무제한 BFS가 아니라 최대 6-hop + confidence pruning입니다.
+- AI/Neo4j가 없어도 핵심 분석 기능은 동작하도록 설계했습니다.
+
+9) 최종 발표 PC Hard Gate
+   powershell -ExecutionPolicy Bypass -File .\verify-final-strict.ps1
+   마지막 줄: === STRICT QUALITY GATE PASSED ===

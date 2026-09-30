@@ -1,0 +1,1 @@
+package org.springframework.http; public final class MediaType { public static final String MULTIPART_FORM_DATA_VALUE="multipart/form-data"; }

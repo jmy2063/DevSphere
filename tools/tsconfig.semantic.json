@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target":"ES2020","lib":["ES2020","DOM","DOM.Iterable"],"strict":true,"skipLibCheck":true,
+    "module":"ESNext","moduleResolution":"Bundler","noEmit":true,"jsx":"react-jsx","allowSyntheticDefaultImports":true
+  },
+  "files": [
+    "../frontend/src/lib/api.ts",
+    "../frontend/src/components/GraphView.tsx",
+    "../frontend/src/App.tsx",
+    "../frontend/src/main.tsx",
+    "ts-stubs/react.d.ts","ts-stubs/react-dom-client.d.ts","ts-stubs/lucide-react.d.ts","ts-stubs/globals.d.ts"
+  ]
+}

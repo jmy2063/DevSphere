@@ -1,0 +1,85 @@
+DevSphere AX 4.0 Final QA Evidence
+Generated: 2026-09-29
+
+=== CORE REGRESSION ===
+PASS  13+ Java classes parsed
+PASS  Controller detected
+PASS  Service detected
+PASS  Repository detected
+PASS  Entity/Table detected
+PASS  POST /orders detected
+PASS  Source paths are portable/relative
+PASS  Method end lines captured
+PASS  Expanded Knowledge Graph nodes built
+PASS  Expanded Knowledge Graph edges built
+PASS  PROJECT node excluded from traversal
+PASS  Caller/controller impact detected
+PASS  Repository impact detected
+PASS  API impact detected
+PASS  Regression test candidate detected
+PASS  Cross-package PaymentService impact detected
+PASS  Cross-package InventoryService impact detected
+PASS  Cross-package AuditService impact detected
+PASS  Deep payment repository impact detected
+PASS  Deep inventory repository impact detected
+PASS  Wide data-layer impact detected
+PASS  SYSTEM scope blast radius is not smaller than LOCAL
+PASS  SYSTEM scope supports depth 6
+PASS  CRI normalized to 0-100
+PASS  CRI breakdown generated
+PASS  Evidence confidence generated
+PASS  Impact area aggregation generated
+PASS  Evidence paths generated
+PASS  Paths include source file and line evidence
+PASS  Method-level payment impact detected
+PASS  Method-level inventory impact detected
+PASS  Changed method preserved in evidence path
+PASS  Multi-hop method path generated
+PASS  Overloaded PaymentService.pay methods captured
+PASS  Method display signatures distinguish overloads
+PASS  Method-call arity disambiguates overloads
+PASS  Unified diff NEW-file line parsed
+PASS  Unified diff OLD-file deletion line preserved for method mapping
+PASS  PR diff line mapped to exact changed method
+PASS  LOCAL scope prunes distant 6-hop node
+PASS  SYSTEM scope reaches 6-hop wide-risk node
+PASS  SYSTEM scope preserves full 6-hop evidence path
+PASS  Cycle-safe traversal terminates without graph explosion
+PASS  Low-confidence distant path is pruned
+PASS  ZIP slip attack blocked
+PASS  Ground Truth Precision/Recall bounded
+PASS  Ground Truth F1/Top-k bounded
+PASS  Ground Truth evaluator matches known impacted targets
+PASS  Analyzer keeps real source directories
+PASS  Analyzer ignores build/generated output
+PASS  Unified diff OLD lines separated
+PASS  Unified diff NEW lines separated
+PASS  Local-variable method receiver resolved
+PASS  Explicit this.method() call resolved
+PASS  Generic type domain dependency preserved
+PASS  Java parse diagnostics surfaced as warnings
+PASS  Graph node attributes are immutable
+PASS  Ground Truth aliases cannot inflate metrics above 1.0
+PASS  Ground Truth ID/name aliases collapse to one logical target
+PASS  Duplicate ZIP handling is deterministic/safe
+PASS  Traversal node cap is enforced exactly
+PASS  Invalid analysis scope rejected
+ALL CORE TESTS PASSED: 62
+
+=== SOURCE SYNTAX ===
+JAVA_PARSE files=37 errors=0
+TS_PARSE files=5 errors=0
+SOURCE SYNTAX CHECK PASSED
+
+=== SEMANTIC COMPILE / TYPECHECK ===
+SEMANTIC_BACKEND_COMPILE_OK
+SEMANTIC_FRONTEND_TYPECHECK_OK
+
+=== STANDALONE SMOKE ===
+REPORT GENERATED: /mnt/data/DevSphere_AX_Final_QA_4_0/demo-output/DevSphere_AX_Report.html
+changed=OrderService.createOrder() scope=SYSTEM CRI=90 level=CRITICAL blastRadius=17 evidence=76% paths=28
+Open: /mnt/data/DevSphere_AX_Final_QA_4_0/demo-output/DevSphere_AX_Report.html
+
+=== SAMPLE ZIP INTEGRITY ===
+    testing: src/test/java/com/example/shop/OrderServiceTest.java   OK
+No errors detected in compressed data of sample-spring-project.zip.

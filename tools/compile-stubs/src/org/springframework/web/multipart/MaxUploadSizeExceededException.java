@@ -1,0 +1,1 @@
+package org.springframework.web.multipart; public class MaxUploadSizeExceededException extends RuntimeException {}

@@ -1,0 +1,10 @@
+classes=13 nodes=32 edges=57
+scope=LOCAL risk=HIGH cri=74 blastRadius=12 evidence=76% paths=14
+scope=FEATURE risk=CRITICAL cri=90 blastRadius=17 evidence=66% paths=28
+scope=SYSTEM risk=CRITICAL cri=90 blastRadius=17 evidence=66% paths=28
+method=OrderService.createOrder() risk=CRITICAL cri=90
+  path 87%: OrderService.createOrder()[src/main/java/com/example/shop/service/OrderService.java:24-29] -> InventoryService.reserve()[src/main/java/com/example/shop/inventory/InventoryService.java:9-9]
+  path 87%: OrderService.createOrder()[src/main/java/com/example/shop/service/OrderService.java:24-29] -> PaymentService.pay()[src/main/java/com/example/shop/payment/PaymentService.java:15-18]
+  path 87%: OrderService.createOrder()[src/main/java/com/example/shop/service/OrderService.java:24-29] -> AuditService.recordOrderCreated()[src/main/java/com/example/shop/audit/AuditService.java:7-7]
+  path 87%: OrderService.createOrder()[src/main/java/com/example/shop/service/OrderService.java:24-29] -> OrderController.createOrder()[src/main/java/com/example/shop/controller/OrderController.java:12-13]
+  path 86%: OrderService.createOrder()[src/main/java/com/example/shop/service/OrderService.java:24-29] -> PaymentService.pay()[src/main/java/com/example/shop/payment/PaymentService.java:15-18] -> PaymentService[src/main/java/com/example/shop/payment/PaymentService.java:5-19]

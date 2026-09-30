@@ -1,0 +1,1 @@
+package org.springframework.web.bind.annotation; import java.lang.annotation.*; import org.springframework.http.HttpStatus; @Retention(RetentionPolicy.RUNTIME) @Target(ElementType.METHOD) public @interface ResponseStatus { HttpStatus value(); }
