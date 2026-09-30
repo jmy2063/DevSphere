@@ -36,10 +36,10 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: Core deterministic regression
-        run: ./verify-core.sh
+        run: bash ./verify-core.sh
 
       - name: Semantic source checks
-        run: ./verify-semantic.sh
+        run: bash ./verify-semantic.sh
 
       - name: Backend tests and bootJar
         working-directory: backend
@@ -50,7 +50,7 @@ jobs:
         run: npm run build
 
       - name: Standalone smoke report
-        run: ./report-demo.sh
+        run: bash ./report-demo.sh
 
       - name: Verify report artifact
         run: test -s demo-output/DevSphere_AX_Report.html
