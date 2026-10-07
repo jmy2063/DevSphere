@@ -1,7 +1,7 @@
 import {useMemo,useState} from 'react';
-import type {Impact,ImpactNode} from '../lib/api';
+import type {Impact,ImpactNode,ImpactPath} from '../lib/api';
 
-export default function ImpactReview({result,onFocus}:{result:Impact;onFocus?:(ids:string[])=>void}){
+export default function ImpactReview({result,onFocus}:{result:Impact;onFocus?:(path:ImpactPath)=>void}){
   const [query,setQuery]=useState('');
   const [kind,setKind]=useState('ALL');
   const [expanded,setExpanded]=useState(false);
@@ -37,7 +37,7 @@ export default function ImpactReview({result,onFocus}:{result:Impact;onFocus?:(i
     <p className="review-note">검색 결과 {paths.length}개 중 {Math.min(paths.length,allPaths?paths.length:5)}개 표시 · 엔진이 반환한 대표 경로입니다.</p>
     {(allPaths?paths:paths.slice(0,5)).map(p=><details className="review-details" key={p.targetId}><summary>{p.targetName} · {p.hopCount}단계 · {Math.round(p.pathConfidence*100)}%</summary>
       <ol className="review-steps">{p.steps.map((s,i)=><li key={`${s.id}-${i}`}><b>{s.name}</b><span>{s.viaRelation} · {s.direction}</span><code>{s.sourcePath?`${s.sourcePath}:${s.line}${s.endLine>s.line?`–${s.endLine}`:''}`:'소스 위치 없음'}</code></li>)}</ol>
-      {onFocus&&<button className="review-button" onClick={()=>onFocus(p.steps.map(s=>s.id))}>그래프에서 이 경로 보기</button>}
+      {onFocus&&<button className="review-button" onClick={()=>onFocus(p)}>그래프에서 이 경로 보기</button>}
     </details>)}
     {!paths.length&&<p className="review-note">표시할 근거 경로가 없습니다.</p>}
     {paths.length>5&&<button className="review-button" onClick={()=>setAllPaths(!allPaths)}>{allPaths?'경로 접기':`나머지 ${paths.length-5}개 경로 모두 보기`}</button>}

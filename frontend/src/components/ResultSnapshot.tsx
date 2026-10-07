@@ -1,4 +1,4 @@
-import type {AnalysisScope,GithubChangeReport,Impact,ImpactComparison,ImpactNode} from '../lib/api';
+import type {AnalysisScope,GithubChangeReport,Impact,ImpactComparison,ImpactNode,ImpactPath} from '../lib/api';
 
 type Props={
   result:Impact|null;
@@ -6,9 +6,11 @@ type Props={
   report:GithubChangeReport|null;
   scope:AnalysisScope;
   onDetails:()=>void;
+  onFocusPath:(path:ImpactPath)=>void;
+  onInspectNode:(id:string)=>void;
 };
 
-export default function ResultSnapshot({result,comparison,report,scope,onDetails}:Props){
+export default function ResultSnapshot({result,comparison,report,scope,onDetails,onFocusPath,onInspectNode}:Props){
   const selected=result||comparison?.[scope]||comparison?.FEATURE||null;
   const pr=report?.kind==='PR';
   const sources=selected?[selected]:report?.results||[];
@@ -23,6 +25,11 @@ export default function ResultSnapshot({result,comparison,report,scope,onDetails
   const title=report?(pr?`PR #${report.reference}`:`Commit ${report.reference.slice(0,8)}`):selected?.changedNodeName||'분석 결과';
   const impactCount=selected?candidates.length:report?.summary.uniqueImpactNodes??0;
   const testCount=selected?allLocalTests.length:report?.summary.tests.length??0;
+  function inspect(id:string){
+    const path=sources.flatMap(row=>row.paths).find(candidate=>candidate.targetId===id);
+    if(path)onFocusPath(path);
+    else onInspectNode(id);
+  }
 
   return <>
     <div className="snapshot-head">
@@ -30,8 +37,8 @@ export default function ResultSnapshot({result,comparison,report,scope,onDetails
       <div className={`snapshot-score ${String(level).toLowerCase()}`}><span>{report?'시작점 최고 CRI':'상대 위험지수 CRI'}</span><strong>{hasScore?score:'—'}{hasScore&&<small>/100</small>}</strong><b>{hasScore?level:'산출 안 됨'}</b></div>
     </div>
     <div className="snapshot-grid">
-      <div className="snapshot-card"><span>영향 후보 · {impactCount}개</span>{topImpact.length?topImpact.map(node=><b key={node.id}>{node.name}<small>{node.type} · {node.depth}단계</small></b>):<p>{report?.results.length?'상세 보고서에서 영향 경로를 확인하세요.':'분석된 영향 후보가 없습니다.'}</p>}</div>
-      <div className="snapshot-card"><span>먼저 확인할 테스트 · {testCount}개</span>{selected?localTests.length?localTests.map(node=><b key={node.id}>{node.name}<small>{location(node)}</small></b>):<p>연결된 테스트 후보가 없습니다. 변경 동작을 직접 확인하세요.</p>:reportTests.length?reportTests.map(test=><b key={test.id}>{test.name}<small>{test.sourcePath}:{test.line}</small></b>):<p>추천 테스트 후보가 없습니다.</p>}</div>
+      <div className="snapshot-card"><span>영향 후보 · {impactCount}개</span>{topImpact.length?topImpact.map(node=><button type="button" className="snapshot-item" key={node.id} onClick={()=>inspect(node.id)}>{node.name}<small>{node.type} · {node.depth}단계 · 근거 보기</small></button>):<p>{report?.results.length?'상세 보고서에서 영향 경로를 확인하세요.':'분석된 영향 후보가 없습니다.'}</p>}</div>
+      <div className="snapshot-card"><span>먼저 확인할 테스트 · {testCount}개</span>{selected?localTests.length?localTests.map(node=><button type="button" className="snapshot-item" key={node.id} onClick={()=>inspect(node.id)}>{node.name}<small>{location(node)} · 근거 보기</small></button>):<p>연결된 테스트 후보가 없습니다. 변경 동작을 직접 확인하세요.</p>:reportTests.length?reportTests.map(test=><button type="button" className="snapshot-item" key={test.id} onClick={()=>inspect(test.id)}>{test.name}<small>{test.sourcePath}:{test.line} · 근거 보기</small></button>):<p>추천 테스트 후보가 없습니다.</p>}</div>
       <div className="snapshot-card snapshot-next"><span>다음 확인</span><p>{report?`${report.summary.changedFiles}개 변경 파일의 매핑 상태와 소스 검증 결과를 확인하세요.`:`${selected?.paths.length||0}개 대표 경로에서 영향을 연결한 근거를 확인하세요.`}</p><button type="button" onClick={onDetails}>상세 결과 보기</button></div>
     </div>
     <p className="snapshot-note">CRI는 장애 발생 확률이 아닌 그래프 근거 기반 상대 지수입니다. 테스트는 실행 결과가 아닌 후보입니다.</p>
