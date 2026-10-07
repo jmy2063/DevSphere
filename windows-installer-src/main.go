@@ -365,7 +365,7 @@ $desktop=%s
 $start=%s
 New-Item -ItemType Directory -Force -Path $start | Out-Null
 $ws=New-Object -ComObject WScript.Shell
-function Link($path,$args,$desc){ $s=$ws.CreateShortcut($path); $s.TargetPath=$exe; $s.Arguments=$args; $s.WorkingDirectory='%s'; $s.Description=$desc; $s.Save() }
+function Link($path,$linkArgs,$desc){ $s=$ws.CreateShortcut($path); $s.TargetPath=$exe; $s.Arguments=$linkArgs; $s.WorkingDirectory='%s'; $s.Description=$desc; $s.Save() }
 Link (Join-Path $desktop 'DevSphere AX.lnk') '' 'DevSphere AX'
 Link (Join-Path $start 'DevSphere AX.lnk') '' 'DevSphere AX'
 Link (Join-Path $start 'DevSphere AX Demo.lnk') '--demo' 'Verified standalone demo'
