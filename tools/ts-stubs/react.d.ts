@@ -14,6 +14,7 @@ declare module 'react' {
   export function useState<T>(initial:T): [T, Dispatch<SetStateAction<T>>];
   export function useEffect(effect:()=>void|(()=>void), deps?: readonly unknown[]): void;
   export function useMemo<T>(factory:()=>T, deps: readonly unknown[]): T;
+  export function useRef<T>(initial:T|null): {current:T|null};
   const React: { StrictMode:(props:any)=>any };
   export default React;
 }
