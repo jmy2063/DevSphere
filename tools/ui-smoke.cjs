@@ -43,6 +43,8 @@ async function main(){
       await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
     });
     await page.goto(process.env.UI_URL||'http://127.0.0.1:5173');
+    await page.locator('input[type=file]').focus();
+    assert.equal(await page.evaluate(()=>document.activeElement?.getAttribute('type')),'file','ZIP picker must be keyboard focusable');
     await page.locator('input[type=file]').setInputFiles({name:'fixture.zip',mimeType:'application/zip',buffer:Buffer.from('fixture')});
     await page.getByText('준비 완료 · fixture').waitFor();
     await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='변경점 분석 입력');
@@ -50,6 +52,15 @@ async function main(){
     await page.getByRole('region',{name:'핵심 분석 결과'}).getByRole('heading',{name:root.name}).waitFor();
     await page.waitForFunction(()=>document.activeElement?.classList.contains('result-snapshot'));
     await page.getByRole('region',{name:'핵심 분석 결과'}).getByText(test.name).waitFor();
+    await page.locator('.snapshot-card').first().getByRole('button',{name:/Worker.process0/}).click();
+    await page.getByRole('region',{name:'선택한 근거 경로'}).getByRole('heading',{name:'Worker.process0()'}).waitFor();
+    assert.equal(await page.locator('.graph-card .node').count(),2);
+    await page.getByRole('button',{name:'METHOD Worker.process0()'}).click();
+    assert.equal(await page.locator('.result-snapshot').count(),1,'Graph inspection must preserve the analysis result');
+    await page.locator('.graph-text-list>summary').click();
+    await page.locator('.graph-text-list button').first().click();
+    assert.equal(await page.locator('.result-snapshot').count(),1,'Text-list inspection must preserve the analysis result');
+    await page.getByRole('button',{name:'전체 그래프로 돌아가기'}).click();
     await page.getByRole('button',{name:'상세 결과 보기'}).click();
     await page.waitForFunction(()=>Math.abs(document.querySelector('#detailed-results').getBoundingClientRect().top)<150);
     await page.getByRole('heading',{name:'이 변경에서 확인할 항목'}).waitFor();
@@ -71,6 +82,9 @@ async function main(){
     await page.getByRole('button',{name:'그래프에서 이 경로 보기'}).last().click();
     assert.equal(await page.locator('.graph-card .node').count(),16,'Focused path must bypass the METHOD display cap');
     assert.equal(await page.locator('.graph-card .edge').count(),15,'Only consecutive path edges should be displayed');
+    assert.equal(await page.locator('.evidence-path li').count(),16,'Evidence steps should include every node on the path');
+    await page.getByRole('button',{name:'16단계 Worker.process14() 살펴보기'}).click();
+    assert.equal(await page.locator('.result-snapshot').count(),1,'Inspecting an evidence step must preserve the analysis result');
     await page.getByRole('button',{name:'전체 그래프로 돌아가기'}).click();
     const output=path.resolve(__dirname,'../benchmark-output');fs.mkdirSync(output,{recursive:true});
     await page.screenshot({path:path.join(output,'review-desktop.png'),fullPage:true});
@@ -117,8 +131,14 @@ async function main(){
     await page.getByLabel('GitHub PR 주소').fill('https://github.com.evil.test/a/b/pull/42');
     await page.getByRole('button',{name:'PR 변경 Method 분석',exact:true}).click();
     await page.waitForTimeout(100);assert.equal(reportRequests,5,'Invalid URLs must not reach the API');
+    assert.equal(await page.locator('.result-snapshot').count(),1,'Invalid PR input must preserve the previous report');
+    await page.locator('.graph-card .node').filter({hasText:'process0'}).first().click();
+    assert.equal(await page.locator('.result-snapshot').count(),1,'Node inspection must keep the PR report');
+    await page.getByRole('button',{name:'이 노드를 변경 시작점으로 선택'}).click();
+    assert.equal(await page.locator('.result-snapshot').count(),0,'Changing the analysis start must clear old results');
+    assert.equal(await page.locator('#selected-node').inputValue(),'m0');
     assert.deepEqual(errors,[]);
-    console.log('PASS: review, PR URL, mapping search, zero-start report, token-free export, mobile layout and stale-error state; mocked API');
+    console.log('PASS: evidence navigation, preserved results, explicit start selection, keyboard upload, PR URL, mapping search, token-free export, mobile layout and stale-error state; mocked API');
   }finally{await browser.close()}
 }
 main().catch(e=>{console.error(e);process.exitCode=1});

@@ -7,10 +7,11 @@ import GraphView from './components/GraphView';
 import ImpactReview from './components/ImpactReview';
 import GithubReportPanel from './components/GithubReportPanel';
 import ResultSnapshot from './components/ResultSnapshot';
+import EvidencePathPanel from './components/EvidencePathPanel';
 import {parseGithubPrUrl} from './lib/github-url';
 import {
   evaluateGroundTruth,githubChangeReport,health,impact,impactComparison,uploadZip,
-  type GithubChangeReport,type AnalysisScope,type Evaluation,type Health,type Impact,type ImpactComparison,type Summary
+  type GithubChangeReport,type AnalysisScope,type Evaluation,type Health,type Impact,type ImpactComparison,type ImpactPath,type Summary
 } from './lib/api';
 
 const scopeInfo:Record<AnalysisScope,{label:string;desc:string;depth:number}>={
@@ -42,7 +43,8 @@ export default function App(){
   const [commitSha,setCommitSha]=useState('');
   const [token,setToken]=useState('');
   const [groundTruth,setGroundTruth]=useState('');
-  const [focusedPath,setFocusedPath]=useState<string[]>([]);
+  const [focusedPath,setFocusedPath]=useState<ImpactPath|null>(null);
+  const [inspectedNodeId,setInspectedNodeId]=useState('');
   const snapshotRef=useRef<HTMLElement>(null);
   const analysisRef=useRef<HTMLElement>(null);
 
@@ -69,9 +71,10 @@ export default function App(){
     return (q?all.filter(n=>(n.name+' '+n.type+' '+n.sourcePath).toLowerCase().includes(q)):all).slice(0,500);
   },[summary,query]);
   const selectedNode=summary?.nodes.find(n=>n.id===selected)||null;
+  const inspectedNode=summary?.nodes.find(n=>n.id===(inspectedNodeId||selected))||null;
 
   function clearOutputs(){
-    setFocusedPath([]);
+    setFocusedPath(null);setInspectedNodeId('');
     setResult(null);setComparison(null);setPrReport(null);setEvaluation(null);
   }
 
@@ -81,7 +84,7 @@ export default function App(){
     try{
       const next=await uploadZip(file);setSummary(next);setUploadedRevision('');
       const first=next.nodes.find(n=>n.type==='SERVICE')?.id||next.nodes.find(n=>n.type==='CONTROLLER')?.id||next.nodes[0]?.id||'';
-      setSelected(first);
+      setSelected(first);setInspectedNodeId(first);
     }catch(e){setError(messageOf(e))}finally{setBusy(false);setBusyLabel('')}
   }
   async function runImpact(){
@@ -93,10 +96,14 @@ export default function App(){
     try{setComparison(await impactComparison(summary.projectId,selected))}catch(e){setError(messageOf(e))}finally{setBusy(false);setBusyLabel('')}
   }
   async function runPr(){
-    if(!summary||busy)return;setBusy(true);setBusyLabel('PR 변경과 영향 경로를 분석하고 있습니다…');setError('');clearOutputs();
+    if(!summary||busy)return;
+    let target:{owner:string;repo:string;pullNumber:number};
     try{
       const number=Number(pr);
-      const target=prUrl.trim()?parseGithubPrUrl(prUrl):{owner,repo,pullNumber:number};
+      target=prUrl.trim()?parseGithubPrUrl(prUrl):{owner,repo,pullNumber:number};
+    }catch(e){setError(messageOf(e));return}
+    setBusy(true);setBusyLabel('PR 변경과 영향 경로를 분석하고 있습니다…');setError('');clearOutputs();
+    try{
       setOwner(target.owner);setRepo(target.repo);setPr(String(target.pullNumber));
       setPrReport(await githubChangeReport(summary.projectId,{...target,scope,maxDepth:scopeInfo[scope].depth,uploadedRevision,verifySources},token));
     }catch(e){setError(messageOf(e))}finally{setBusy(false);setBusyLabel('')}
@@ -115,8 +122,12 @@ export default function App(){
     try{setEvaluation(await evaluateGroundTruth(summary.projectId,selected,scope,scopeInfo[scope].depth,expected,5))}
     catch(e){setError(messageOf(e))}finally{setBusy(false);setBusyLabel('')}
   }
-  function focusPath(ids:string[]){
-    setFocusedPath(ids);
+  function focusPath(path:ImpactPath){
+    setFocusedPath(path);setInspectedNodeId(path.targetId);
+    document.querySelector('.graph-section')?.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  function inspectNode(id:string){
+    setFocusedPath(null);setInspectedNodeId(id);
     document.querySelector('.graph-section')?.scrollIntoView({behavior:'smooth',block:'start'});
   }
   function drop(e:DragEvent){e.preventDefault();setDragging(false);const file=e.dataTransfer.files?.[0];if(file)void analyzeFile(file)}
@@ -152,21 +163,23 @@ export default function App(){
     </section>
 
     {(result||comparison||prReport)&&<section ref={snapshotRef} tabIndex={-1} className="result-snapshot" aria-label="핵심 분석 결과">
-      <ResultSnapshot result={result} comparison={comparison} report={prReport} scope={scope} onDetails={()=>document.getElementById('detailed-results')?.scrollIntoView({behavior:'smooth',block:'start'})}/>
+      <ResultSnapshot result={result} comparison={comparison} report={prReport} scope={scope} onDetails={()=>document.getElementById('detailed-results')?.scrollIntoView({behavior:'smooth',block:'start'})} onFocusPath={focusPath} onInspectNode={inspectNode}/>
     </section>}
 
     <section className="workspace">
       <div className="graph-section">
         <div className="section-heading"><div><Network/><span>Software Knowledge Graph</span></div>{summary&&<small>{summary.projectId}</small>}</div>
-        {focusedPath.length>0&&<div className="graph-focus-status"><span>근거 경로 · {focusedPath.length}개 노드</span><button className="review-button" onClick={()=>setFocusedPath([])}>전체 그래프로 돌아가기</button></div>}
-        {summary?<GraphView nodes={summary.nodes} edges={summary.edges} selected={selected} focusIds={focusedPath} onSelect={id=>{if(!busy){setSelected(id);clearOutputs()}}}/>:<Empty/>}
+        {focusedPath&&<div className="graph-focus-status"><span>근거 경로 · {focusedPath.steps.length}개 노드</span><button className="review-button" onClick={()=>setFocusedPath(null)}>전체 그래프로 돌아가기</button></div>}
+        {summary?<GraphView nodes={summary.nodes} edges={summary.edges} selected={inspectedNode?.id} focusIds={focusedPath?.steps.map(step=>step.id)||[]} onSelect={id=>{if(!busy)setInspectedNodeId(id)}}/>:<Empty/>}
+        {inspectedNode&&<div className="graph-inspector"><div><span>살펴보는 노드 · {inspectedNode.type}</span><b>{inspectedNode.name}</b><small>{inspectedNode.sourcePath?`${inspectedNode.sourcePath}:${inspectedNode.line}`:'소스 위치 없음'}</small></div>{['CONTROLLER','SERVICE','REPOSITORY','ENTITY','METHOD'].includes(inspectedNode.type)&&inspectedNode.id!==selected&&<button type="button" className="review-button" disabled={busy} onClick={()=>{clearOutputs();setSelected(inspectedNode.id);setInspectedNodeId(inspectedNode.id)}}>이 노드를 변경 시작점으로 선택</button>}</div>}
+        {focusedPath&&<EvidencePathPanel path={focusedPath} onInspect={setInspectedNodeId}/>}
       </div>
 
       <aside ref={analysisRef} tabIndex={-1} aria-label="변경점 분석 입력">
         <div className="section-heading"><div><GitBranch/><span>2. 변경점 선택</span></div>{summary&&(result||comparison||prReport||evaluation)&&<button className="icon-action" onClick={exportReport} title="JSON 결과 저장" aria-label="JSON 결과 저장"><Download size={16}/></button>}</div>
         <p className="analysis-intro">메서드를 직접 선택하거나 아래에 GitHub PR 주소를 붙여 넣으세요.</p>
         <label className="field-label" htmlFor="node-query">분석 대상 검색</label><div className="search"><Search size={16}/><input id="node-query" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Method, Service, Controller…" disabled={!summary||busy}/></div>
-        <label className="field-label" htmlFor="selected-node">변경 시작점</label><select id="selected-node" value={selected} onChange={e=>{setSelected(e.target.value);clearOutputs()}} disabled={!summary||busy}>{candidates.map(n=><option key={n.id} value={n.id}>{n.type} · {n.name}</option>)}</select>
+        <label className="field-label" htmlFor="selected-node">변경 시작점</label><select id="selected-node" value={selected} onChange={e=>{clearOutputs();setSelected(e.target.value);setInspectedNodeId(e.target.value)}} disabled={!summary||busy}>{candidates.map(n=><option key={n.id} value={n.id}>{n.type} · {n.name}</option>)}</select>
         <label className="field-label" htmlFor="analysis-scope">분석 범위</label>
         <select id="analysis-scope" value={scope} onChange={e=>{setScope(e.target.value as AnalysisScope);clearOutputs()}} disabled={busy}>
           {(Object.keys(scopeInfo) as AnalysisScope[]).map(k=><option value={k} key={k}>{scopeInfo[k].label} — {scopeInfo[k].desc}</option>)}
@@ -212,12 +225,12 @@ export default function App(){
 function Metric({label,value}:{label:string;value:number|string}){return <div className="metric"><b>{value}</b><span>{label}</span></div>}
 function Empty(){return <div className="empty"><Network size={38}/><b>분석할 프로젝트를 업로드하세요</b><span>샘플 프로젝트로 LOCAL / FEATURE / SYSTEM 범위를 비교할 수 있습니다.</span></div>}
 
-function ComparisonPanel({value,onFocus}:{value:ImpactComparison;onFocus:(ids:string[])=>void}){
+function ComparisonPanel({value,onFocus}:{value:ImpactComparison;onFocus:(path:ImpactPath)=>void}){
   const rows=(['LOCAL','FEATURE','SYSTEM'] as AnalysisScope[]).map(k=>value[k]).filter(Boolean);
   return <div className="comparison-panel"><div className="path-title"><BarChart3 size={16}/><b>동일 변경점 · 범위별 리스크 비교</b></div><div className="compare-grid">{rows.map(r=><div className={`compare-card ${r.riskLevel.toLowerCase()}`} key={r.scope}><span>{r.scope}</span><strong>{r.riskScore}</strong><b>{r.riskLevel}</b><small>Blast {r.blastRadius} · Paths {r.paths.length} · Evidence {Math.round(r.evidenceConfidence*100)}%</small></div>)}</div><p className="compare-note">LOCAL → FEATURE → SYSTEM으로 넓어질 때 어떤 영향 노드와 경로가 추가되는지 비교해 광역 분석의 근거를 확인합니다.</p>{rows.map(r=><details className="compare-details" key={r.scope}><summary>{r.scope} · {r.changedNodeName} · CRI {r.riskScore}</summary><RiskPanel result={r} onFocus={onFocus}/></details>)}</div>
 }
 
-function PrPanel({rows,onFocus}:{rows:Impact[];onFocus:(ids:string[])=>void}){
+function PrPanel({rows,onFocus}:{rows:Impact[];onFocus:(path:ImpactPath)=>void}){
   const sorted=[...rows].sort((a,b)=>b.riskScore-a.riskScore);
   return <div className="pr-results"><div className="path-title"><Github size={16}/><b>GitHub 변경 Method 분석 · {rows.length}개 시작점</b></div>{sorted.map((r,i)=><details className="compare-details" open={i===0} key={r.changedNode}><summary>{r.changedNodeName} · {r.riskLevel} · CRI {r.riskScore} · Blast {r.blastRadius}</summary><RiskPanel result={r} onFocus={onFocus}/></details>)}</div>
 }
@@ -227,7 +240,7 @@ function EvaluationPanel({value}:{value:Evaluation}){
   return <div className="evaluation-result"><div className="eval-metrics"><span><b>{pct(value.precision)}</b>Precision</span><span><b>{pct(value.recall)}</b>Recall</span><span><b>{pct(value.f1)}</b>F1</span><span><b>{pct(value.topKRecall)}</b>Top-{value.topK}</span></div><p>TP {value.truePositive} · FP {value.falsePositive} · FN {value.falseNegative} · Expected {value.expectedCount} · Predicted {value.predictedCount}</p>{value.missed.length>0&&<small>Missed: {value.missed.join(' · ')}</small>}</div>
 }
 
-function RiskPanel({result,onFocus}:{result:Impact;onFocus?:(ids:string[])=>void}){
+function RiskPanel({result,onFocus}:{result:Impact;onFocus?:(path:ImpactPath)=>void}){
   const areaLabel:Record<string,string>={API_SURFACE:'API / Controller',BUSINESS_LOGIC:'Business Logic',DATA:'Data Layer',TEST:'Tests',METHOD:'Methods',OTHER:'Other'};
   return <div className={`risk ${result.riskLevel.toLowerCase()}`}>
     <div className="risk-head"><div><AlertTriangle/><span>CHANGE RISK INDEX · {result.scope}</span><strong>{result.riskLevel}</strong></div><div className="score">{result.riskScore}<small>/100 CRI</small></div></div>
