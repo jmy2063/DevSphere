@@ -36,3 +36,10 @@ Full Web Program은 JDK 17+, Node.js 20+, npm, Gradle 또는 IntelliJ Gradle 환
 이 프로젝트용 EXE는 상용 코드 서명 인증서로 서명되지 않았습니다. Windows에서 '알 수 없는 게시자' 또는 SmartScreen 경고가 표시될 수 있습니다. 이것은 애플리케이션 로직 오류와는 별개의 코드 서명/평판 문제입니다.
 
 배포 전에는 제공된 SHA-256 파일과 EXE 해시를 비교하십시오.
+
+## 현재 소스로 다시 빌드
+
+설치 프로그램 소스와 빌드 명령은 [windows-installer-src/README.md](../windows-installer-src/README.md)에 있습니다.
+빌드 후 `release-output/DevSphere_AX_Setup.exe --verify-payload`와
+`--self-test`를 실행하면 내장 파일의 해시, 격리 설치, 재설치, 설치된 런처 실행을 확인할 수 있습니다.
+실제 사용자 설치 경로와 바로가기는 이 검증에서 변경하지 않습니다.

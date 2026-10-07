@@ -24,6 +24,9 @@ dist/
 benchmark-output/
 .benchmark-cache/
 demo-output/
+release-output/
+windows-installer-src/payload.zip
+windows-installer-src/payload.sha256
 __pycache__/
 *.pyc
 
