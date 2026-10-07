@@ -14,20 +14,26 @@ async function main(){
     const root={id:'root',name:'CheckoutService',type:'SERVICE',sourcePath:'src/CheckoutService.java',line:1,confidence:1,attributes:{}};
     const methods=Array.from({length:15},(_,i)=>({id:`m${i}`,name:`Worker.process${i}()`,type:'METHOD',sourcePath:'src/Worker.java',line:i+2,confidence:.9,attributes:{}}));
     const test={id:'test',name:'CheckoutServiceTest',type:'TEST',sourcePath:'test/CheckoutServiceTest.java',line:8,confidence:.9,attributes:{}};
-    const nodes=[root,...methods,test];
+    const systemExtra={id:'api',name:'GET /checkout',type:'API',sourcePath:'src/CheckoutController.java',line:12,confidence:.8,attributes:{}};
+    const nodes=[root,...methods,test,systemExtra];
     const edges=methods.map((n,i)=>({source:i?methods[i-1].id:'root',target:n.id,type:'CALLS',confidence:.9}));
     edges.push({source:'m0',target:'m14',type:'CALLS',confidence:.6});
+    edges.push({source:'root',target:'api',type:'EXPOSES',confidence:.8});
     const impactNodes=[...methods,test].map((n,i)=>({...n,depth:i<3?1:2,relation:'CALLS',direction:'DOWNSTREAM',endLine:n.line+1}));
     const paths=methods.map((n,i)=>({targetId:n.id,targetName:n.name,targetType:n.type,hopCount:i+1,pathConfidence:.8,steps:[root,...methods.slice(0,i+1)].map(s=>({...s,endLine:s.line+1,viaRelation:'CALLS',direction:'DOWNSTREAM'}))}));
     const result={changedNode:'root',changedNodeName:root.name,scope:'FEATURE',directImpact:impactNodes.slice(0,3),indirectImpact:impactNodes.slice(3),apis:[],entities:[],tests:[test.name],areas:[],riskScore:61,riskLevel:'HIGH',riskReasons:['Fixture review'],riskBreakdown:{'Test Gap':6},evidenceConfidence:.8,blastRadius:1,maxDepth:4,exploredNodes:17,paths,explanation:'브라우저 검증용 고정 응답'};
-    let failImpact=false,reportRequests=0,expectToken=false;
+    const apiImpact={...systemExtra,depth:3,relation:'EXPOSES',direction:'DOWNSTREAM',endLine:13};
+    const apiPath={targetId:'api',targetName:systemExtra.name,targetType:'API',hopCount:1,pathConfidence:.8,steps:[root,systemExtra].map(s=>({...s,endLine:s.line+1,viaRelation:'EXPOSES',direction:'DOWNSTREAM'}))};
+    const comparison={LOCAL:{...result,scope:'LOCAL',directImpact:impactNodes.slice(0,1),indirectImpact:[],paths:paths.slice(0,1),riskScore:22,riskLevel:'LOW'},FEATURE:result,SYSTEM:{...result,scope:'SYSTEM',indirectImpact:[...impactNodes.slice(3),apiImpact],paths:[...paths,apiPath],riskScore:72,riskLevel:'HIGH'}};
+    let failImpact=false,reportRequests=0,expectToken=false,largeFixture=false;
     const githubReport={kind:'PR',owner:'spring-projects',repo:'spring-petclinic',reference:'42',baseSha:'a'.repeat(40),headSha:'b'.repeat(40),declaredRevision:'',revisionStatus:'UNVERIFIED',mappingSide:'HEAD',warnings:['ZIP 버전 미확인'],files:[{filename:'src/CheckoutService.java',previousFilename:'',changeStatus:'modified',mappingStatus:'MAPPED_METHOD',reason:'HEAD 줄 좌표',startNodeIds:['root']},{filename:'src/Missing.java',previousFilename:'',changeStatus:'removed',mappingStatus:'UNMAPPED',reason:'ZIP에서 해당 파일을 찾지 못했습니다.',startNodeIds:[]}],results:[result],summary:{changedFiles:2,javaFiles:2,methodMappedFiles:1,fallbackFiles:0,unmappedJavaFiles:1,changedStarts:1,uniqueImpactNodes:16,uniqueStructuralNodes:1,maxStartRiskScore:61,tests:[{id:test.id,name:test.name,sourcePath:test.sourcePath,line:8,depth:2,confidence:.9,changedStarts:[root.name]}]}};
     const sourceVerification={status:'VERIFIED',revision:'b'.repeat(40),zipPrefix:'',localFiles:2,repositoryFiles:2,matchedFiles:2,changedFiles:0,missingFiles:0,extraFiles:0,message:'분석 대상 Java 파일 전체의 경로·바이트 내용이 커밋과 일치합니다.',differences:[]};
     await page.route('**/api/**',async route=>{
       const url=new URL(route.request().url());
       let body;
       if(url.pathname==='/api/health')body={status:'UP',service:'fixture',time:'',neo4jConfigured:false};
-      else if(url.pathname.endsWith('/upload'))body={projectId:'fixture',analyzedClasses:2,nodeCount:nodes.length,edgeCount:edges.length,analysisDurationMs:12,controllers:0,services:1,repositories:0,entities:0,methods:15,apis:0,tests:1,nodes,edges,warnings:[]};
+      else if(url.pathname.endsWith('/upload')){const shownNodes=largeFixture?[...nodes,...Array.from({length:510},(_,i)=>({id:`large${i}`,name:`Large.method${i}()`,type:'METHOD',sourcePath:'src/Large.java',line:i+1,confidence:.9,attributes:{}}))]:nodes;body={projectId:'fixture',analyzedClasses:2,nodeCount:shownNodes.length,edgeCount:edges.length,analysisDurationMs:12,controllers:0,services:1,repositories:0,entities:0,methods:shownNodes.filter(n=>n.type==='METHOD').length,apis:1,tests:1,nodes:shownNodes,edges,warnings:[]};}
+      else if(url.pathname.endsWith('/impact-comparison'))body=comparison;
       else if(url.pathname.endsWith('/impact')){
         if(failImpact)return route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({message:'Fixture request failed'})});
         body=result;
@@ -92,6 +98,15 @@ async function main(){
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Mobile page must not overflow horizontally');
     assert.equal(await page.locator('.workspace aside').evaluate(el=>el.getBoundingClientRect().top<document.querySelector('.graph-section').getBoundingClientRect().top),true,'Analysis controls should precede the graph on mobile');
     await page.screenshot({path:path.join(output,'review-mobile.png'),fullPage:true});
+    await page.getByRole('button',{name:'3단계 비교'}).click();
+    await page.getByRole('region',{name:'FEATURE 범위 증가분'}).getByText('새 영향 후보 15개').waitFor();
+    await page.getByRole('region',{name:'SYSTEM 범위 증가분'}).getByText('새 영향 후보 1개').waitFor();
+    await page.getByRole('region',{name:'SYSTEM 범위 증가분'}).getByText('API 1').waitFor();
+    await page.screenshot({path:path.join(output,'comparison-mobile.png'),fullPage:true});
+    await page.getByRole('region',{name:'FEATURE 범위 증가분'}).getByRole('button',{name:/Worker.process1/}).click();
+    await page.getByRole('region',{name:'선택한 근거 경로'}).getByRole('heading',{name:'Worker.process1()'}).waitFor();
+    assert.equal(await page.locator('.result-snapshot').count(),1,'Comparison evidence navigation must preserve the result');
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Comparison must fit mobile width');
     failImpact=true;
     await page.getByRole('button',{name:'영향 분석',exact:true}).click();
     await page.getByText('Fixture request failed').waitFor();
@@ -137,8 +152,16 @@ async function main(){
     await page.getByRole('button',{name:'이 노드를 변경 시작점으로 선택'}).click();
     assert.equal(await page.locator('.result-snapshot').count(),0,'Changing the analysis start must clear old results');
     assert.equal(await page.locator('#selected-node').inputValue(),'m0');
+    largeFixture=true;
+    await page.locator('input[type=file]').setInputFiles({name:'large.zip',mimeType:'application/zip',buffer:Buffer.from('fixture-large')});
+    await page.getByText('분석 가능한 노드 526개').waitFor();
+    await page.getByLabel('분석 대상 검색').fill('Large.method509');
+    await page.locator('#selected-node').selectOption('large509');
+    await page.getByLabel('분석 대상 검색').fill('no-match');
+    assert.equal(await page.locator('#selected-node').inputValue(),'large509','Filtering must retain the selected node');
+    await page.getByText('검색 결과 0개 · 현재 선택은 목록에 유지').waitFor();
     assert.deepEqual(errors,[]);
-    console.log('PASS: evidence navigation, preserved results, explicit start selection, keyboard upload, PR URL, mapping search, token-free export, mobile layout and stale-error state; mocked API');
+    console.log('PASS: comparison deltas, large-node selection, evidence navigation, preserved results, keyboard upload, PR URL, mobile layout and stale-error state; mocked API');
   }finally{await browser.close()}
 }
 main().catch(e=>{console.error(e);process.exitCode=1});

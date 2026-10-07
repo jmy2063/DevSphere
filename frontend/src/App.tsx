@@ -11,7 +11,7 @@ import EvidencePathPanel from './components/EvidencePathPanel';
 import {parseGithubPrUrl} from './lib/github-url';
 import {
   evaluateGroundTruth,githubChangeReport,health,impact,impactComparison,uploadZip,
-  type GithubChangeReport,type AnalysisScope,type Evaluation,type Health,type Impact,type ImpactComparison,type ImpactPath,type Summary
+  type GithubChangeReport,type AnalysisScope,type Evaluation,type Health,type Impact,type ImpactComparison,type ImpactPath,type ImpactNode,type Summary
 } from './lib/api';
 
 const scopeInfo:Record<AnalysisScope,{label:string;desc:string;depth:number}>={
@@ -65,12 +65,14 @@ export default function App(){
     });
     return ()=>cancelAnimationFrame(frame);
   },[result,comparison,prReport]);
-  const candidates=useMemo(()=>{
+  const candidateSearch=useMemo(()=>{
     const all=summary?.nodes.filter(n=>['CONTROLLER','SERVICE','REPOSITORY','ENTITY','METHOD'].includes(n.type))||[];
     const q=query.trim().toLowerCase();
-    return (q?all.filter(n=>(n.name+' '+n.type+' '+n.sourcePath).toLowerCase().includes(q)):all).slice(0,500);
+    const matches=q?all.filter(n=>(n.name+' '+n.type+' '+n.sourcePath).toLowerCase().includes(q)):all;
+    return {total:matches.length,nodes:matches.slice(0,500)};
   },[summary,query]);
   const selectedNode=summary?.nodes.find(n=>n.id===selected)||null;
+  const candidates=selectedNode&&!candidateSearch.nodes.some(n=>n.id===selectedNode.id)?[selectedNode,...candidateSearch.nodes]:candidateSearch.nodes;
   const inspectedNode=summary?.nodes.find(n=>n.id===(inspectedNodeId||selected))||null;
 
   function clearOutputs(){
@@ -82,7 +84,7 @@ export default function App(){
     if(busy)return;
     setBusy(true);setBusyLabel('프로젝트를 분석하고 있습니다…');setError('');clearOutputs();
     try{
-      const next=await uploadZip(file);setSummary(next);setUploadedRevision('');
+      const next=await uploadZip(file);setSummary(next);setQuery('');setGroundTruth('');setUploadedRevision('');
       const first=next.nodes.find(n=>n.type==='SERVICE')?.id||next.nodes.find(n=>n.type==='CONTROLLER')?.id||next.nodes[0]?.id||'';
       setSelected(first);setInspectedNodeId(first);
     }catch(e){setError(messageOf(e))}finally{setBusy(false);setBusyLabel('')}
@@ -179,7 +181,8 @@ export default function App(){
         <div className="section-heading"><div><GitBranch/><span>2. 변경점 선택</span></div>{summary&&(result||comparison||prReport||evaluation)&&<button className="icon-action" onClick={exportReport} title="JSON 결과 저장" aria-label="JSON 결과 저장"><Download size={16}/></button>}</div>
         <p className="analysis-intro">메서드를 직접 선택하거나 아래에 GitHub PR 주소를 붙여 넣으세요.</p>
         <label className="field-label" htmlFor="node-query">분석 대상 검색</label><div className="search"><Search size={16}/><input id="node-query" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Method, Service, Controller…" disabled={!summary||busy}/></div>
-        <label className="field-label" htmlFor="selected-node">변경 시작점</label><select id="selected-node" value={selected} onChange={e=>{clearOutputs();setSelected(e.target.value);setInspectedNodeId(e.target.value)}} disabled={!summary||busy}>{candidates.map(n=><option key={n.id} value={n.id}>{n.type} · {n.name}</option>)}</select>
+        <label className="field-label" htmlFor="selected-node">변경 시작점</label><select id="selected-node" value={selected} onChange={e=>{clearOutputs();setSelected(e.target.value);setInspectedNodeId(e.target.value)}} disabled={!summary||busy}>{candidates.map(n=><option key={n.id} value={n.id}>{n.type} · {n.name}{n.id===selected&&!candidateSearch.nodes.some(item=>item.id===n.id)?' · 현재 선택':''}</option>)}</select>
+        {summary&&<p className="candidate-status" role="status">{query.trim()?`검색 결과 ${candidateSearch.total}개`:`분석 가능한 노드 ${candidateSearch.total}개`}{candidateSearch.total>500?' · 처음 500개 표시':''}{selectedNode&&!candidateSearch.nodes.some(n=>n.id===selectedNode.id)?' · 현재 선택은 목록에 유지':''}</p>}
         <label className="field-label" htmlFor="analysis-scope">분석 범위</label>
         <select id="analysis-scope" value={scope} onChange={e=>{setScope(e.target.value as AnalysisScope);clearOutputs()}} disabled={busy}>
           {(Object.keys(scopeInfo) as AnalysisScope[]).map(k=><option value={k} key={k}>{scopeInfo[k].label} — {scopeInfo[k].desc}</option>)}
@@ -216,7 +219,7 @@ export default function App(){
       </aside>
     </section>
     <section id="detailed-results" className="result-workspace" aria-label="상세 분석 결과">
-      {result?<RiskPanel result={result} onFocus={focusPath}/>:comparison?<ComparisonPanel value={comparison} onFocus={focusPath}/>:prReport?<GithubReportPanel report={prReport}><PrPanel rows={prReport.results} onFocus={focusPath}/></GithubReportPanel>:null}
+      {result?<RiskPanel result={result} onFocus={focusPath}/>:comparison?<ComparisonPanel value={comparison} onFocus={focusPath} onInspect={inspectNode}/>:prReport?<GithubReportPanel report={prReport}><PrPanel rows={prReport.results} onFocus={focusPath}/></GithubReportPanel>:null}
     </section>
     <footer>AST → Method-level Graph → Confidence-weighted Traversal → Blast Radius → Change Risk Index → Ground Truth Metrics → Grounded AI Explanation</footer>
   </main>
@@ -225,10 +228,19 @@ export default function App(){
 function Metric({label,value}:{label:string;value:number|string}){return <div className="metric"><b>{value}</b><span>{label}</span></div>}
 function Empty(){return <div className="empty"><Network size={38}/><b>분석할 프로젝트를 업로드하세요</b><span>샘플 프로젝트로 LOCAL / FEATURE / SYSTEM 범위를 비교할 수 있습니다.</span></div>}
 
-function ComparisonPanel({value,onFocus}:{value:ImpactComparison;onFocus:(path:ImpactPath)=>void}){
+function ComparisonPanel({value,onFocus,onInspect}:{value:ImpactComparison;onFocus:(path:ImpactPath)=>void;onInspect:(id:string)=>void}){
   const rows=(['LOCAL','FEATURE','SYSTEM'] as AnalysisScope[]).map(k=>value[k]).filter(Boolean);
-  return <div className="comparison-panel"><div className="path-title"><BarChart3 size={16}/><b>동일 변경점 · 범위별 리스크 비교</b></div><div className="compare-grid">{rows.map(r=><div className={`compare-card ${r.riskLevel.toLowerCase()}`} key={r.scope}><span>{r.scope}</span><strong>{r.riskScore}</strong><b>{r.riskLevel}</b><small>Blast {r.blastRadius} · Paths {r.paths.length} · Evidence {Math.round(r.evidenceConfidence*100)}%</small></div>)}</div><p className="compare-note">LOCAL → FEATURE → SYSTEM으로 넓어질 때 어떤 영향 노드와 경로가 추가되는지 비교해 광역 분석의 근거를 확인합니다.</p>{rows.map(r=><details className="compare-details" key={r.scope}><summary>{r.scope} · {r.changedNodeName} · CRI {r.riskScore}</summary><RiskPanel result={r} onFocus={onFocus}/></details>)}</div>
+  return <div className="comparison-panel"><div className="path-title"><BarChart3 size={16}/><b>동일 변경점 · 범위별 리스크 비교</b></div><div className="compare-grid">{rows.map(r=><div className={`compare-card ${r.riskLevel.toLowerCase()}`} key={r.scope}><span>{r.scope}</span><strong>{r.riskScore}</strong><b>{r.riskLevel}</b><small>Blast {r.blastRadius} · Paths {r.paths.length} · Evidence {Math.round(r.evidenceConfidence*100)}%</small></div>)}</div><p className="compare-note">범위를 넓힐 때 새로 포함된 노드를 확인하세요. CRI는 그래프 근거 기반 상대 지수입니다.</p><div className="compare-deltas">{rows.map((r,i)=>{
+    const before=rows[i-1];
+    const previousIds=new Set(before?impactNodes(before).map(n=>n.id):[]);
+    const currentNodes=impactNodes(r);
+    const currentIds=new Set(currentNodes.map(n=>n.id));
+    const added=currentNodes.filter(n=>!previousIds.has(n.id));
+    const removed=before?impactNodes(before).filter(n=>!currentIds.has(n.id)):[];
+    const scoreDelta=r.riskScore-(before?.riskScore||0);
+    return <section className="compare-delta" key={r.scope} aria-label={`${r.scope} 범위 증가분`}><div className="compare-delta-head"><div><span>{before?`${before.scope} → ${r.scope}`:`${r.scope} 기준`}</span><b>새 영향 후보 {added.length}개</b></div><small>CRI {before?`${scoreDelta>=0?'+':''}${scoreDelta}`:`${r.riskScore}`}</small></div><div className="compare-delta-counts"><span>테스트 {added.filter(n=>n.type==='TEST').length}</span><span>API {added.filter(n=>n.type==='API').length}</span><span>데이터 {added.filter(n=>['ENTITY','TABLE','REPOSITORY'].includes(n.type)).length}</span></div>{added.length?<><ul>{added.slice(0,5).map(node=>{const path=r.paths.find(p=>p.targetId===node.id);return <li key={node.id}><button type="button" onClick={()=>path?onFocus(path):onInspect(node.id)}><b>{node.name}</b><small>{node.type} · {node.depth}단계 · {path?'근거 경로 보기':'그래프에서 보기'}</small></button></li>})}</ul>{added.length>5&&<p>그 외 {added.length-5}개는 아래 {r.scope} 상세 결과에서 확인</p>}</>:<p>앞선 범위에서 추가된 영향 후보가 없습니다.</p>}{removed.length>0&&<p>이전 범위에만 있던 후보 {removed.length}개는 이번 범위 결과에서 제외됐습니다.</p>}</section>})}</div>{rows.map(r=><details className="compare-details" key={r.scope}><summary>{r.scope} · {r.changedNodeName} · CRI {r.riskScore}</summary><RiskPanel result={r} onFocus={onFocus}/></details>)}</div>
 }
+function impactNodes(result:Impact):ImpactNode[]{return [...new Map([...result.directImpact,...result.indirectImpact].map(node=>[node.id,node])).values()]}
 
 function PrPanel({rows,onFocus}:{rows:Impact[];onFocus:(path:ImpactPath)=>void}){
   const sorted=[...rows].sort((a,b)=>b.riskScore-a.riskScore);
