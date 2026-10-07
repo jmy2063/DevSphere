@@ -13,6 +13,7 @@ import javax.tools.*;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -46,22 +47,8 @@ public class JavaStaticAnalyzer {
             throw new IllegalArgumentException("Source directory does not exist: " + root);
         }
 
-        List<Path> javaFiles;
-        try (var stream = Files.walk(normalizedRoot)) {
-            javaFiles = stream.filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().endsWith(".java"))
-                    .filter(p -> !isIgnoredPath(normalizedRoot, p))
-                    .sorted().toList();
-        }
+        List<Path> javaFiles = sourceFiles(normalizedRoot);
         if (javaFiles.isEmpty()) return new AnalysisOutput(List.of(), List.of());
-        if (javaFiles.size() > MAX_JAVA_FILES) {
-            throw new IllegalArgumentException("Project contains too many Java files (max " + MAX_JAVA_FILES + ").");
-        }
-        for (Path file : javaFiles) {
-            if (Files.size(file) > MAX_JAVA_FILE_BYTES) {
-                throw new IllegalArgumentException("Java source file exceeds 5 MB limit: " + normalizedRoot.relativize(file));
-            }
-        }
 
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         if (compiler == null) {
@@ -69,7 +56,7 @@ public class JavaStaticAnalyzer {
         }
 
         DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
-        try (StandardJavaFileManager fm = compiler.getStandardFileManager(diagnostics, Locale.ROOT, null)) {
+        try (StandardJavaFileManager fm = compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8)) {
             Iterable<? extends JavaFileObject> units = fm.getJavaFileObjectsFromPaths(javaFiles);
             JavacTask task = (JavacTask) compiler.getTask(null, fm, diagnostics,
                     List.of("-proc:none", "-Xlint:none", "-implicit:none"), null, units);
@@ -85,7 +72,6 @@ public class JavaStaticAnalyzer {
                 try {
                     sourcePath = normalizedRoot.relativize(absoluteSource).toString().replace('\\', '/');
                 } catch (IllegalArgumentException ex) {
-                    // Defensive fallback for unusual compiler file-system providers.
                     sourcePath = absoluteSource.getFileName().toString();
                 }
                 for (Tree declaration : cu.getTypeDecls()) {
@@ -96,6 +82,27 @@ public class JavaStaticAnalyzer {
             }
             return new AnalysisOutput(List.copyOf(result), diagnosticsToWarnings(normalizedRoot, diagnostics.getDiagnostics()));
         }
+    }
+
+    /** Shared selection for parsing and byte-level source fingerprints. */
+    public static List<Path> sourceFiles(Path root) throws IOException {
+        Path normalizedRoot = root.toAbsolutePath().normalize();
+        List<Path> javaFiles;
+        try (var stream = Files.walk(normalizedRoot)) {
+            javaFiles = stream.filter(Files::isRegularFile)
+                    .filter(p -> isIncludedSourcePath(normalizedRoot.relativize(p).toString().replace('\\','/')))
+                    .sorted().toList();
+        }
+        if (javaFiles.size() > MAX_JAVA_FILES) {
+            throw new IllegalArgumentException("Project contains too many Java files (max " + MAX_JAVA_FILES + ").");
+        }
+        for (Path file : javaFiles) {
+            if (Files.size(file) > MAX_JAVA_FILE_BYTES) {
+                throw new IllegalArgumentException("Java source file exceeds 5 MB limit: " + normalizedRoot.relativize(file));
+            }
+        }
+
+        return javaFiles;
     }
 
     private List<String> diagnosticsToWarnings(Path root, List<Diagnostic<? extends JavaFileObject>> diagnostics) {
@@ -143,6 +150,12 @@ public class JavaStaticAnalyzer {
         info.sourcePath = sourcePath;
         info.line = lineOf(cu, ct, positions);
         info.endLine = endLineOf(cu, ct, positions, info.line);
+        for (ImportTree imported : cu.getImports()) {
+            if (imported.isStatic()) continue;
+            String qualified = imported.getQualifiedIdentifier().toString();
+            if (qualified.endsWith(".*")) info.wildcardImports.add(qualified.substring(0, qualified.length()-2));
+            else info.imports.put(simpleName(qualified), qualified);
+        }
 
         for (AnnotationTree annotation : ct.getModifiers().getAnnotations()) {
             String name = simpleName(annotation.getAnnotationType().toString());
@@ -153,13 +166,24 @@ public class JavaStaticAnalyzer {
         if (looksLikeTestClass(info.className, info.annotations)) info.type = NodeType.TEST;
 
         String ext = ct.getExtendsClause() == null ? "" : ct.getExtendsClause().toString();
-        if (!ext.isBlank()) info.superTypes.add(simpleName(cleanType(ext)));
+        if (!ext.isBlank()) info.superTypes.add(cleanType(ext));
         for (Tree impl : ct.getImplementsClause()) {
-            String t = simpleName(cleanType(impl.toString()));
+            String t = cleanType(impl.toString());
             if (!t.isBlank()) info.superTypes.add(t);
         }
         String impl = ct.getImplementsClause().stream().map(Object::toString).collect(Collectors.joining(","));
         info.extendsOrImplements = (ext + " " + impl).trim();
+        // Spring Data interfaces do not need @Repository. Resolve the imported base
+        // rather than trusting a user-defined type with the same simple name.
+        if (info.type == NodeType.CLASS && ct.getKind() == Tree.Kind.INTERFACE && info.superTypes.stream().anyMatch(t -> {
+            String qualified = info.imports.getOrDefault(t, t);
+            return Set.of("org.springframework.data.repository.Repository",
+                    "org.springframework.data.repository.CrudRepository",
+                    "org.springframework.data.repository.ListCrudRepository",
+                    "org.springframework.data.repository.PagingAndSortingRepository",
+                    "org.springframework.data.repository.ListPagingAndSortingRepository",
+                    "org.springframework.data.jpa.repository.JpaRepository").contains(qualified);
+        })) info.type = NodeType.REPOSITORY;
 
         String classBasePath = requestPath(ct.getModifiers().getAnnotations());
         for (Tree member : ct.getMembers()) {
@@ -177,7 +201,7 @@ public class JavaStaticAnalyzer {
         String rawType = variable.getType().toString();
         String declared = cleanType(rawType);
         String simple = simpleName(declared);
-        if (!simple.isBlank()) info.fieldTypes.put(variable.getName().toString(), simple);
+        if (!simple.isBlank()) info.fieldTypes.put(variable.getName().toString(), declared);
         addTypeDependencies(info.dependencies, rawType);
     }
 
@@ -190,7 +214,7 @@ public class JavaStaticAnalyzer {
         List<String> parameterTypes = new ArrayList<>();
         for (VariableTree parameter : method.getParameters()) {
             String rawType = parameter.getType().toString();
-            String type = simpleName(cleanType(rawType));
+            String type = cleanType(rawType);
             parameterTypes.add(readableType(rawType));
             if (!type.isBlank()) variableTypes.put(parameter.getName().toString(), type);
             addTypeDependencies(info.dependencies, rawType);
@@ -249,7 +273,7 @@ public class JavaStaticAnalyzer {
             @Override public Void visitVariable(VariableTree node, Void unused) {
                 if (node.getType() != null) {
                     String rawType = node.getType().toString();
-                    String type = simpleName(cleanType(rawType));
+                    String type = cleanType(rawType);
                     if (!type.isBlank()) variableTypes.putIfAbsent(node.getName().toString(), type);
                     addTypeDependencies(dependencies, rawType);
                 }
@@ -316,14 +340,11 @@ public class JavaStaticAnalyzer {
         return Optional.empty();
     }
 
-    private static boolean isIgnoredPath(Path root, Path file) {
-        Path relative;
-        try { relative = root.relativize(file); }
-        catch (IllegalArgumentException ex) { return true; }
-        for (Path part : relative) {
-            if (IGNORED_DIRECTORY_NAMES.contains(part.toString().toLowerCase(Locale.ROOT))) return true;
-        }
-        return false;
+    public static boolean isIncludedSourcePath(String path) {
+        if (path == null || !path.endsWith(".java")) return false;
+        for (String part : path.replace('\\','/').split("/"))
+            if (IGNORED_DIRECTORY_NAMES.contains(part.toLowerCase(Locale.ROOT))) return false;
+        return true;
     }
 
     private int lineOf(CompilationUnitTree cu, Tree tree, SourcePositions positions) {

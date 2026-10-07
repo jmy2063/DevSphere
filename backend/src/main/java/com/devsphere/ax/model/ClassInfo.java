@@ -12,6 +12,9 @@ public class ClassInfo {
     public NodeType type = NodeType.CLASS;
     public String tableName = "";
     public String extendsOrImplements = "";
+    /** Explicit and wildcard imports retain the declaring compilation unit's type context. */
+    public final Map<String,String> imports = new LinkedHashMap<>();
+    public final List<String> wildcardImports = new ArrayList<>();
 
     /** Simple/FQ type dependencies discovered from fields, constructor and method parameters. */
     public final Set<String> dependencies = new LinkedHashSet<>();

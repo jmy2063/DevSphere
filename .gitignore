@@ -20,7 +20,12 @@ dist/
 .core-demo-build/
 .report-build/
 .syntax-check/
+.benchmark-build/
+benchmark-output/
+.benchmark-cache/
 demo-output/
+__pycache__/
+*.pyc
 
 # OS
 .DS_Store

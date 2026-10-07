@@ -6,6 +6,21 @@ DevSphere AX는 Java/Spring Boot 프로젝트와 GitHub Commit/PR 변경정보�
 
 > 핵심 원칙: **Graph가 영향 사실과 경로를 찾고, AI는 그 근거를 설명합니다.**
 
+## 개발 중 개선 사항 (2026-10-06)
+
+전체 영향 후보 검색/유형 필터, 테스트 근거 위치, Node ID 복사, 근거 경로별 그래프 탐색을 추가했습니다.
+3개 합성 fixture의 30개 시나리오 평가는 `verify-benchmark.ps1` 또는 `bash verify-benchmark.sh`로 반복 실행합니다.
+합성 평가 수치는 실제 서비스의 정확도를 의미하지 않습니다.
+변경 내용과 검증 범위는 `docs/IMPROVEMENT_REPORT_2026_10_06.md`, 데이터 설명은 `benchmarks/README.md`를 참고합니다.
+
+후속 개선에서는 공식 Spring 예제 3개를 고정한 30개 소스 검증 항목을 추가하고,
+Spring Data 저장소·상속 메소드·패키지 타입 해석과 Windows UTF-8 분석을 보완했습니다.
+실제 HTTP/브라우저/GitHub 커밋 검증과 빌드 결과는 `docs/IMPROVEMENT_REPORT_2026_10_07.md`를 참고합니다.
+
+PR 주소를 붙여 넣으면 base/head, 파일별 매핑 사유, 중복 제거 영향과 테스트 후보를 함께 표시합니다.
+ZIP 커밋 SHA가 base/head와 다르면 분석을 중단하며, SHA는 사용자 선언으로 표시합니다.
+실제 Petclinic PR 검증과 사용법은 `docs/PR_WORKFLOW_REPORT_2026_10_07.md`를 참고합니다.
+
 ## 4.0에서 강화된 품질 항목
 
 - Core regression **62 assertions PASS**
@@ -94,7 +109,16 @@ JDK 17+에서 IntelliJ IDEA로 `backend`를 Gradle Project로 열고:
 Gradle Sync → test → bootRun
 ```
 
-Gradle CLI가 있다면:
+별도 Gradle 설치 없이 포함된 Wrapper로 빌드할 수 있습니다. JDK 17을 설치하고 JAVA_HOME에 지정하세요.
+처음 실행할 때 Gradle 배포본과 Maven 의존성을 다운로드합니다.
+
+```powershell
+cd backend
+.\gradlew.bat clean test bootJar --no-daemon
+.\gradlew.bat bootRun --no-daemon
+```
+
+Windows 실행 스크립트:
 
 ```bat
 run-backend.bat

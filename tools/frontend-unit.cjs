@@ -1,0 +1,12 @@
+const fs=require('node:fs');
+const path=require('node:path');
+const assert=require('node:assert/strict');
+const Module=require('node:module');
+const ts=require('../frontend/node_modules/typescript');
+const file=path.resolve(__dirname,'../frontend/src/lib/github-url.ts');
+const compiled=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
+const mod=new Module(file,module);mod.filename=file;mod._compile(compiled,file);
+const {parseGithubPrUrl}=mod.exports;
+assert.deepEqual(parseGithubPrUrl(' https://github.com/spring-projects/spring-petclinic/pull/42/files?diff=split#abc '),{owner:'spring-projects',repo:'spring-petclinic',pullNumber:42});
+for(const bad of ['http://github.com/a/b/pull/1','https://github.com.evil.test/a/b/pull/1','https://token@github.com/a/b/pull/1','https://github.com/a/b/issues/1','https://github.com/a/b/pull/0','https://github.com/a/b/pull/2147483648','https://github.com/a%2fb/c/pull/1'])assert.throws(()=>parseGithubPrUrl(bad));
+console.log('PASS: PR URL parsing and invalid host, credentials, path, number rejection');

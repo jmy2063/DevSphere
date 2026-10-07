@@ -6,6 +6,7 @@ import com.devsphere.ax.graph.GraphRegistry;
 import com.devsphere.ax.graph.SoftwareGraph;
 import com.devsphere.ax.impact.ImpactAnalyzer;
 import com.devsphere.ax.model.*;
+import com.devsphere.ax.util.SourceFingerprints;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -34,7 +35,7 @@ public class AnalysisService {
         }
         String projectId = uniqueProjectId(suggestedName);
         SoftwareGraph graph = builder.build(projectId, classes);
-        Optional<String> evictedProject = registry.put(projectId, graph);
+        Optional<String> evictedProject = registry.put(projectId, graph,SourceFingerprints.capture(sourceRoot));
 
         List<String> warnings = new ArrayList<>(parsed.warnings());
         evictedProject.ifPresent(id -> {
@@ -82,6 +83,9 @@ public class AnalysisService {
     }
 
     public List<String> projectIds() { return registry.ids(); }
+    public Map<String,String> sourceFingerprints(String projectId) {
+        return registry.sourceFingerprints(projectId).orElseThrow(()->new IllegalArgumentException("Unknown or expired project: "+projectId));
+    }
     public boolean removeProject(String projectId) {
         if (projectId == null || projectId.isBlank()) return false;
         boolean removed = registry.remove(projectId);

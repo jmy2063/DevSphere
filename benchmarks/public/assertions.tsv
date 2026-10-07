@@ -1,0 +1,31 @@
+# project	case	kind	source	target-or-type	relation-or-scope
+spring-petclinic	vet-repository-kind	TYPE	org.springframework.samples.petclinic.vet.VetRepository	REPOSITORY	
+spring-petclinic	owner-repository-kind	TYPE	org.springframework.samples.petclinic.owner.OwnerRepository	REPOSITORY	
+spring-petclinic	pet-type-repository-kind	TYPE	org.springframework.samples.petclinic.owner.PetTypeRepository	REPOSITORY	
+spring-petclinic	vet-repository-entity	EDGE	org.springframework.samples.petclinic.vet.VetRepository	org.springframework.samples.petclinic.vet.Vet	MANAGES
+spring-petclinic	owner-repository-entity	EDGE	org.springframework.samples.petclinic.owner.OwnerRepository	org.springframework.samples.petclinic.owner.Owner	MANAGES
+spring-petclinic	pet-type-repository-entity	EDGE	org.springframework.samples.petclinic.owner.PetTypeRepository	org.springframework.samples.petclinic.owner.PetType	MANAGES
+spring-petclinic	formatter-inherited-get-name	EDGE	org.springframework.samples.petclinic.owner.PetTypeFormatter#PetTypeFormatter.print(PetType, Locale)	org.springframework.samples.petclinic.model.NamedEntity#NamedEntity.getName()	CALLS
+spring-petclinic	formatter-loop-inherited-get-name	EDGE	org.springframework.samples.petclinic.owner.PetTypeFormatter#PetTypeFormatter.parse(String, Locale)	org.springframework.samples.petclinic.model.NamedEntity#NamedEntity.getName()	CALLS
+spring-petclinic	formatter-repository-call	EDGE	org.springframework.samples.petclinic.owner.PetTypeFormatter#PetTypeFormatter.parse(String, Locale)	org.springframework.samples.petclinic.owner.PetTypeRepository#PetTypeRepository.findPetTypes()	CALLS
+spring-petclinic	vet-test-link	EDGE	org.springframework.samples.petclinic.vet.VetControllerTests	org.springframework.samples.petclinic.vet.VetController	TESTS
+spring-petclinic	owner-table	EDGE	org.springframework.samples.petclinic.owner.Owner	table:owners	MAPS_TO
+spring-petclinic	pet-type-table	EDGE	org.springframework.samples.petclinic.owner.PetType	table:types	MAPS_TO
+spring-petclinic	new-pet-get-handler	EDGE	api:GET:/owners/{ownerId}/pets/new	org.springframework.samples.petclinic.owner.PetController#PetController.initCreationForm(Owner, ModelMap)	HANDLED_BY
+spring-petclinic	formatter-base-method-impact	IMPACT	org.springframework.samples.petclinic.model.NamedEntity#NamedEntity.getName()	org.springframework.samples.petclinic.owner.PetTypeFormatter#PetTypeFormatter.print(PetType, Locale)	LOCAL
+spring-petclinic	vet-html-test-impact	IMPACT	org.springframework.samples.petclinic.vet.VetController#VetController.findPaginated(int)	org.springframework.samples.petclinic.vet.VetControllerTests	LOCAL
+gs-rest-service	rest-controller-kind	TYPE	com.example.restservice.GreetingController	CONTROLLER	
+gs-rest-service	greeting-handler	EDGE	api:GET:/greeting	com.example.restservice.GreetingController#GreetingController.greeting(String)	HANDLED_BY
+gs-rest-service	greeting-domain-dependency	EDGE	com.example.restservice.GreetingController	com.example.restservice.Greeting	USES
+gs-rest-service	greeting-test-link	EDGE	com.example.restservice.GreetingControllerTests	com.example.restservice.GreetingController	TESTS
+gs-rest-service	greeting-test-impact	IMPACT	com.example.restservice.GreetingController#GreetingController.greeting(String)	com.example.restservice.GreetingControllerTests	LOCAL
+gs-accessing-data-jpa	customer-repository-kind	TYPE	com.example.accessingdatajpa.CustomerRepository	REPOSITORY	
+gs-accessing-data-jpa	customer-entity-kind	TYPE	com.example.accessingdatajpa.Customer	ENTITY	
+gs-accessing-data-jpa	customer-repository-entity	EDGE	com.example.accessingdatajpa.CustomerRepository	com.example.accessingdatajpa.Customer	MANAGES
+gs-accessing-data-jpa	customer-table	EDGE	com.example.accessingdatajpa.Customer	table:customer	MAPS_TO
+gs-accessing-data-jpa	customer-find-by-name-call	EDGE	com.example.accessingdatajpa.AccessingDataJpaApplication#AccessingDataJpaApplication.demo(CustomerRepository)	com.example.accessingdatajpa.CustomerRepository#CustomerRepository.findByLastName(String)	CALLS
+gs-accessing-data-jpa	customer-repository-test	EDGE	com.example.accessingdatajpa.CustomerRepositoryTests	com.example.accessingdatajpa.CustomerRepository	TESTS
+gs-accessing-data-jpa	customer-name-test-impact	IMPACT	com.example.accessingdatajpa.CustomerRepository#CustomerRepository.findByLastName(String)	com.example.accessingdatajpa.CustomerRepositoryTests	LOCAL
+gs-accessing-data-jpa	customer-name-data-impact	IMPACT	com.example.accessingdatajpa.CustomerRepository#CustomerRepository.findByLastName(String)	com.example.accessingdatajpa.Customer	LOCAL
+gs-accessing-data-jpa	customer-name-table-impact	IMPACT	com.example.accessingdatajpa.CustomerRepository#CustomerRepository.findByLastName(String)	table:customer	LOCAL
+spring-petclinic	vet-page-handler	EDGE	api:GET:/vets.html	org.springframework.samples.petclinic.vet.VetController#VetController.showVetList(int, Model, RedirectAttributes)	HANDLED_BY

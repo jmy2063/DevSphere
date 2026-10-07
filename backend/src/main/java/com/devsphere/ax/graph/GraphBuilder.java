@@ -76,14 +76,14 @@ public class GraphBuilder {
             String sourceClassId = classId(c);
 
             for (String dep : c.dependencies) {
-                index.resolve(dep).ifPresent(target -> {
+                index.resolve(dep, c).ifPresent(target -> {
                     String targetId = classId(target);
                     if (!targetId.equals(sourceClassId)) graph.addEdge(new GraphEdge(sourceClassId, targetId, relationFor(c.type), 0.93));
                 });
             }
 
             for (String superType : c.superTypes) {
-                index.resolve(superType).ifPresent(target -> {
+                index.resolve(superType, c).ifPresent(target -> {
                     String targetId = classId(target);
                     if (!targetId.equals(sourceClassId)) graph.addEdge(new GraphEdge(sourceClassId, targetId, "INHERITS", 0.90));
                 });
@@ -92,7 +92,7 @@ public class GraphBuilder {
             if (c.type == NodeType.REPOSITORY && !c.extendsOrImplements.isBlank()) {
                 Matcher matcher = GENERIC.matcher(c.extendsOrImplements);
                 if (matcher.find()) {
-                    index.resolve(matcher.group(1)).ifPresent(target ->
+                    index.resolve(matcher.group(1), c).ifPresent(target ->
                             graph.addEdge(new GraphEdge(sourceClassId, classId(target), "MANAGES", 0.96)));
                 }
             }
@@ -103,21 +103,14 @@ public class GraphBuilder {
                 Map<String, Set<Integer>> observedCounts = c.methodCallArgumentCounts.getOrDefault(sourceKey, Map.of());
                 for (String call : methodEntry.getValue()) {
                     resolveInvocation(c, sourceKey, call, index).ifPresent(target -> {
-                        List<String> allKeys = target.owner.methodKeysByName(target.methodName);
                         Set<Integer> argCounts = observedCounts.getOrDefault(call, Set.of());
-                        List<String> targetKeys = allKeys;
-                        if (!argCounts.isEmpty()) {
-                            List<String> arityMatches = allKeys.stream()
-                                    .filter(key -> argCounts.contains(target.owner.methodParameterCounts.getOrDefault(key, -1)))
-                                    .toList();
-                            if (!arityMatches.isEmpty()) targetKeys = arityMatches;
-                        }
-                        if (targetKeys.isEmpty()) {
+                        List<MethodTarget> targetMethods = resolveMethods(target.owner, target.methodName, argCounts, index, new HashSet<>());
+                        if (targetMethods.isEmpty()) {
                             graph.addEdge(new GraphEdge(sourceMethodId, classId(target.owner), "CALLS", 0.82));
                         } else {
-                            double confidence = targetKeys.size() == 1 ? 0.95 : 0.76;
-                            for (String key : targetKeys) {
-                                String targetMethodId = methodId(target.owner, key);
+                            double confidence = targetMethods.size() == 1 ? 0.95 : 0.76;
+                            for (MethodTarget method : targetMethods) {
+                                String targetMethodId = methodId(method.owner, method.key);
                                 if (graph.node(targetMethodId).isPresent()) {
                                     graph.addEdge(new GraphEdge(sourceMethodId, targetMethodId, "CALLS", confidence));
                                 }
@@ -133,9 +126,9 @@ public class GraphBuilder {
             if (c.type != NodeType.TEST) continue;
             String source = classId(c);
             String base = c.className.replaceFirst("(Tests?|IT)$", "");
-            index.resolve(base).ifPresent(target -> graph.addEdge(new GraphEdge(source, classId(target), "TESTS", 0.92)));
+            index.resolve(base, c).ifPresent(target -> graph.addEdge(new GraphEdge(source, classId(target), "TESTS", 0.92)));
             for (String dep : c.dependencies) {
-                index.resolve(dep).ifPresent(target -> graph.addEdge(new GraphEdge(source, classId(target), "TESTS", 0.90)));
+                index.resolve(dep, c).ifPresent(target -> graph.addEdge(new GraphEdge(source, classId(target), "TESTS", 0.90)));
             }
         }
         return graph;
@@ -149,7 +142,8 @@ public class GraphBuilder {
         int dot = call.lastIndexOf('.');
         if (dot < 0) {
             String method = call.replaceAll("[^A-Za-z0-9_$].*", "");
-            return source.methodKeysByName(method).isEmpty() ? Optional.empty() : Optional.of(new InvocationTarget(source, method));
+            return resolveMethods(source, method, Set.of(), index, new HashSet<>()).isEmpty()
+                    ? Optional.empty() : Optional.of(new InvocationTarget(source, method));
         }
         String receiverExpr = call.substring(0, dot);
         String method = call.substring(dot + 1).replaceAll("[^A-Za-z0-9_$].*", "");
@@ -159,7 +153,7 @@ public class GraphBuilder {
         if ("this".equals(receiver)) return Optional.of(new InvocationTarget(source, method));
         if ("super".equals(receiver)) {
             for (String superType : source.superTypes) {
-                Optional<ClassInfo> owner = index.resolve(superType);
+                Optional<ClassInfo> owner = index.resolve(superType, source);
                 if (owner.isPresent()) return owner.map(value -> new InvocationTarget(value, method));
             }
             return Optional.empty();
@@ -168,9 +162,9 @@ public class GraphBuilder {
         Map<String,String> locals = source.methodVariableTypes.getOrDefault(sourceMethodKey, Map.of());
         String declaredType = locals.get(receiver);
         if (declaredType == null) declaredType = source.fieldTypes.get(receiver);
-        if (declaredType != null) return index.resolve(declaredType).map(owner -> new InvocationTarget(owner, method));
+        if (declaredType != null) return index.resolve(declaredType, source).map(owner -> new InvocationTarget(owner, method));
         if (!receiver.isBlank() && Character.isUpperCase(receiver.charAt(0))) {
-            return index.resolve(receiver).map(owner -> new InvocationTarget(owner, method));
+            return index.resolve(receiverExpr, source).map(owner -> new InvocationTarget(owner, method));
         }
         return Optional.empty();
     }
@@ -192,6 +186,29 @@ public class GraphBuilder {
     }
 
     private record InvocationTarget(ClassInfo owner, String methodName) {}
+    private record MethodTarget(ClassInfo owner, String key) {}
+
+    private List<MethodTarget> resolveMethods(ClassInfo owner, String name, Set<Integer> counts,
+                                              ClassIndex index, Set<String> visited) {
+        if (!visited.add(owner.fqcn())) return List.of();
+        List<MethodTarget> methods = new ArrayList<>();
+        for (String key : owner.methodKeysByName(name)) {
+            if (counts.isEmpty() || counts.contains(owner.methodParameterCounts.getOrDefault(key, -1))) {
+                methods.add(new MethodTarget(owner, key));
+            }
+        }
+        // Only overridden parameter signatures are hidden; same-arity overloads remain ambiguous.
+        Set<List<String>> declaredSignatures = new HashSet<>();
+        methods.forEach(m -> declaredSignatures.add(m.owner.methodParameterTypes.getOrDefault(m.key, List.of())));
+        for (String parentType : owner.superTypes) {
+            index.resolve(parentType, owner).ifPresent(parent -> {
+                for (MethodTarget inherited : resolveMethods(parent, name, counts, index, new HashSet<>(visited))) {
+                    if (!declaredSignatures.contains(inherited.owner.methodParameterTypes.getOrDefault(inherited.key, List.of()))) methods.add(inherited);
+                }
+            });
+        }
+        return methods.stream().distinct().toList();
+    }
 
     private static final class ClassIndex {
         private final Map<String, ClassInfo> fq = new HashMap<>();
@@ -202,11 +219,20 @@ public class GraphBuilder {
                 simple.computeIfAbsent(c.className, k -> new ArrayList<>()).add(c);
             }
         }
-        Optional<ClassInfo> resolve(String name) {
+        Optional<ClassInfo> resolve(String name, ClassInfo context) {
             if (name == null || name.isBlank()) return Optional.empty();
             String clean = name.replace("? extends ", "").replace("? super ", "").trim();
             ClassInfo exact = fq.get(clean);
             if (exact != null) return Optional.of(exact);
+            // A qualified name must never fall back to an unrelated same-named class.
+            if (clean.contains(".")) return Optional.empty();
+            String imported = context.imports.get(clean);
+            if (imported != null) return Optional.ofNullable(fq.get(imported));
+            ClassInfo samePackage = fq.get(context.packageName + "." + clean);
+            if (samePackage != null) return Optional.of(samePackage);
+            List<ClassInfo> wildcardMatches = context.wildcardImports.stream()
+                    .map(p -> fq.get(p + "." + clean)).filter(Objects::nonNull).distinct().toList();
+            if (!wildcardMatches.isEmpty()) return wildcardMatches.size() == 1 ? Optional.of(wildcardMatches.get(0)) : Optional.empty();
             int dot = clean.lastIndexOf('.');
             String s = dot >= 0 ? clean.substring(dot + 1) : clean;
             List<ClassInfo> values = simple.getOrDefault(s, List.of());

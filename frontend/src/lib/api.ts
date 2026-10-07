@@ -29,6 +29,14 @@ export type Impact = {
   maxDepth:number; exploredNodes:number; paths:ImpactPath[]; explanation:string;
 };
 export type ImpactComparison = Record<AnalysisScope, Impact>;
+export type GithubChangeReport={
+  kind:string;owner:string;repo:string;reference:string;baseSha:string;headSha:string;declaredRevision:string;revisionStatus:string;mappingSide:string;
+  warnings:string[];files:{filename:string;previousFilename:string;changeStatus:string;mappingStatus:string;reason:string;startNodeIds:string[]}[];
+  sourceVerification?:{status:string;revision:string;zipPrefix:string;localFiles:number;repositoryFiles:number;matchedFiles:number;changedFiles:number;missingFiles:number;extraFiles:number;message:string;differences:{path:string;status:string}[]};
+  results:Impact[];summary:{changedFiles:number;javaFiles:number;methodMappedFiles:number;fallbackFiles:number;unmappedJavaFiles:number;
+    changedStarts:number;uniqueImpactNodes:number;uniqueStructuralNodes:number;maxStartRiskScore:number;
+    tests:{id:string;name:string;sourcePath:string;line:number;depth:number;confidence:number;changedStarts:string[]}[]};
+};
 export type Health = {status:string; service:string; time:string; neo4jConfigured:boolean};
 export type Evaluation = {
   changedNode:string;scope:string;expectedCount:number;predictedCount:number;truePositive:number;falsePositive:number;falseNegative:number;
@@ -103,6 +111,17 @@ export async function githubPrImpact(
   return request<Impact[]>(`${API}/api/analysis/${encodeURIComponent(projectId)}/github-pr-impact`,{
     method:'POST',headers,body:JSON.stringify({owner:owner.trim(),repo:repo.trim(),pullNumber,scope,maxDepth})
   },45_000);
+}
+
+export async function githubChangeReport(projectId:string,body:{owner:string;repo:string;pullNumber?:number;sha?:string;scope:AnalysisScope;maxDepth:number;uploadedRevision:string;verifySources?:boolean},token?:string):Promise<GithubChangeReport>{
+  if(!body.owner.trim()||!body.repo.trim())throw new Error('GitHub owner와 repository를 입력해주세요.');
+  if(body.uploadedRevision&&!/^[a-fA-F0-9]{40}$/.test(body.uploadedRevision))throw new Error('ZIP 커밋은 전체 40자리 SHA를 입력해주세요.');
+  if(body.sha!==undefined&&!/^[a-fA-F0-9]{7,64}$/.test(body.sha))throw new Error('Commit SHA 형식이 올바르지 않습니다.');
+  if(body.sha===undefined&&(!Number.isInteger(body.pullNumber)||!body.pullNumber||body.pullNumber<1||body.pullNumber>2147483647))throw new Error('PR 번호 범위를 확인해주세요.');
+  const headers:Record<string,string>={'Content-Type':'application/json'};
+  if(token?.trim())headers['X-GitHub-Token']=token.trim();
+  const endpoint=body.sha!==undefined?'github-commit-report':'github-pr-report';
+  return request<GithubChangeReport>(`${API}/api/analysis/${encodeURIComponent(projectId)}/${endpoint}`,{method:'POST',headers,body:JSON.stringify({...body,owner:body.owner.trim(),repo:body.repo.trim()})},90_000);
 }
 
 export async function githubCommitImpact(

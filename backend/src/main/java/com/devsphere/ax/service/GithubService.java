@@ -60,6 +60,11 @@ public class GithubService {
         return get("https://api.github.com/repos/" + owner + "/" + repo + "/commits/" + sha, token);
     }
 
+    public JsonNode tree(String owner,String repo,String treeSha,String token) {
+        validateRepo(owner,repo);validateSha(treeSha);
+        return get("https://api.github.com/repos/"+owner+"/"+repo+"/git/trees/"+treeSha+"?recursive=1",token);
+    }
+
     /**
      * Retrieves the paginated commit file list. GitHub may paginate the files field for large commits;
      * this method prevents silently analyzing only the first page.

@@ -33,21 +33,30 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Core deterministic regression
         run: bash ./verify-core.sh
+
+      - name: Synthetic impact benchmark and evaluation regression
+        run: bash ./verify-benchmark.sh
+
+      - name: Pinned public Spring source checks
+        run: bash ./verify-public-benchmark.sh
 
       - name: Semantic source checks
         run: bash ./verify-semantic.sh
 
       - name: Backend tests and bootJar
         working-directory: backend
-        run: gradle clean test bootJar --no-daemon
+        run: bash ./gradlew clean test bootJar --no-daemon
 
       - name: Frontend strict typecheck and build
         working-directory: frontend
         run: npm run build
+
+      - name: PR URL validation
+        run: node tools/frontend-unit.cjs
 
       - name: Standalone smoke report
         run: bash ./report-demo.sh

@@ -25,10 +25,14 @@ if (-not (Test-Path "$Root\demo-output\DevSphere_AX_Report.html")) { throw "Demo
 
 Write-Host "[4/6] Backend dependency-resolved build" -ForegroundColor Cyan
 $Gradle = Get-Command gradle -ErrorAction SilentlyContinue
-if (-not $Gradle) { throw "Gradle CLI is required for STRICT mode (or run the same clean test bootJar tasks from IntelliJ Gradle)." }
+$GradleRunner = Join-Path $Root 'backend\gradlew.bat'
+if (-not (Test-Path $GradleRunner)) {
+  if (-not $Gradle) { throw "Gradle Wrapper or Gradle CLI is required for STRICT mode." }
+  $GradleRunner = $Gradle.Source
+}
 Push-Location "$Root\backend"
 try {
-  & gradle clean test bootJar --no-daemon
+  & $GradleRunner clean test bootJar --no-daemon
   if ($LASTEXITCODE -ne 0) { throw "Gradle clean test bootJar failed." }
 } finally { Pop-Location }
 Write-Host "[OK] Backend test + bootJar" -ForegroundColor Green

@@ -1,5 +1,5 @@
 declare module 'react' {
-  export type ReactNode = unknown;
+  export type ReactNode = JSX.Element | string | number | boolean | null | undefined | Iterable<ReactNode>;
   export type SetStateAction<T> = T | ((prev:T)=>T);
   export type Dispatch<A> = (value:A)=>void;
 

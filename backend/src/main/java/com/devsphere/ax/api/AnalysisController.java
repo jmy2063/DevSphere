@@ -4,6 +4,10 @@ import com.devsphere.ax.model.AnalysisScope;
 import com.devsphere.ax.model.AnalysisSummary;
 import com.devsphere.ax.model.ImpactResult;
 import com.devsphere.ax.model.EvaluationResult;
+import com.devsphere.ax.model.GithubChangeReport;
+import com.devsphere.ax.service.GithubChangeAnalysisService;
+import com.devsphere.ax.service.GithubSourceVerificationService;
+import com.devsphere.ax.model.SourceVerification;
 import com.devsphere.ax.impact.ChangedNodeLocator;
 import com.devsphere.ax.service.AiExplanationService;
 import com.devsphere.ax.service.AnalysisService;
@@ -30,14 +34,18 @@ public class AnalysisController {
     private final AiExplanationService ai;
     private final GithubService github;
     private final EvaluationService evaluation;
+    private final GithubChangeAnalysisService githubAnalysis;
+    private final GithubSourceVerificationService sourceVerification;
     private final ChangedNodeLocator changedNodeLocator = new ChangedNodeLocator();
 
     public AnalysisController(AnalysisService analysis, AiExplanationService ai, GithubService github,
-                              EvaluationService evaluation) {
+                              EvaluationService evaluation, GithubChangeAnalysisService githubAnalysis,GithubSourceVerificationService sourceVerification) {
         this.analysis = analysis;
         this.ai = ai;
         this.github = github;
         this.evaluation = evaluation;
+        this.githubAnalysis = githubAnalysis;
+        this.sourceVerification=sourceVerification;
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -114,6 +122,43 @@ public class AnalysisController {
         return analyzeGithubFiles(projectId, files, AnalysisScope.from(request.scope()), request.maxDepth());
     }
 
+    @PostMapping("/{projectId}/github-pr-report")
+    public GithubChangeReport githubPrReport(@PathVariable String projectId,@RequestBody GithubReportRequest request,
+            @RequestHeader(value="X-GitHub-Token",required=false)String token){
+        var meta=github.pullRequest(request.owner(),request.repo(),request.pullNumber(),token);
+        var files=github.pullRequestFiles(request.owner(),request.repo(),request.pullNumber(),token);
+        var after=github.pullRequest(request.owner(),request.repo(),request.pullNumber(),token);
+        if(!meta.path("base").path("sha").asText().equals(after.path("base").path("sha").asText())
+                ||!meta.path("head").path("sha").asText().equals(after.path("head").path("sha").asText()))
+            throw new ExternalServiceException("파일을 읽는 동안 PR 버전이 변경되었습니다. 다시 분석해주세요.");
+        return githubReport(projectId,"PR",Integer.toString(request.pullNumber()),request,token,
+                meta.path("base").path("sha").asText(""),meta.path("head").path("sha").asText(""),files);
+    }
+
+    @PostMapping("/{projectId}/github-commit-report")
+    public GithubChangeReport githubCommitReport(@PathVariable String projectId,@RequestBody GithubReportRequest request,
+            @RequestHeader(value="X-GitHub-Token",required=false)String token){
+        var meta=github.commit(request.owner(),request.repo(),request.sha(),token);
+        String parent="";
+        for(JsonNode p:meta.path("parents")){parent=p.path("sha").asText("");break;}
+        var files=github.commitFiles(request.owner(),request.repo(),meta.path("sha").asText(),token);
+        return githubReport(projectId,"COMMIT",request.sha(),request,token,parent,meta.path("sha").asText(""),files);
+    }
+
+    private GithubChangeReport githubReport(String project,String kind,String reference,GithubReportRequest request,String token,
+            String base,String head,Iterable<JsonNode> files) {
+        if(!request.verifySources())return githubAnalysis.analyze(project,kind,request.owner(),request.repo(),reference,base,head,
+                request.uploadedRevision(),files,AnalysisScope.from(request.scope()),request.maxDepth());
+        String declared=request.uploadedRevision()==null?"":request.uploadedRevision().trim();
+        if(!declared.isEmpty()&&!declared.matches("[a-fA-F0-9]{40}"))throw new IllegalArgumentException("ZIP 커밋은 전체 40자리 SHA를 입력해주세요.");
+        String target=declared.isEmpty()?head:declared;
+        var verification=!declared.isEmpty()&&!declared.equalsIgnoreCase(base)&&!declared.equalsIgnoreCase(head)
+                ?SourceVerification.unavailable(declared,"선언한 커밋이 BASE/HEAD와 다릅니다.")
+                :sourceVerification.verify(project,request.owner(),request.repo(),target,token);
+        return githubAnalysis.analyze(project,kind,request.owner(),request.repo(),reference,base,head,request.uploadedRevision(),files,
+                AnalysisScope.from(request.scope()),request.maxDepth(),verification);
+    }
+
     /** Ground Truth evaluation for one change scenario. */
     @PostMapping("/{projectId}/evaluate")
     public EvaluationResult evaluate(@PathVariable String projectId, @RequestBody EvaluationRequest request) {
@@ -178,6 +223,7 @@ public class AnalysisController {
     public record ImpactComparisonRequest(String nodeId) {}
     public record GithubPrImpactRequest(String owner, String repo, int pullNumber, String scope, Integer maxDepth) {}
     public record GithubCommitImpactRequest(String owner, String repo, String sha, String scope, Integer maxDepth) {}
+    public record GithubReportRequest(String owner,String repo,int pullNumber,String sha,String scope,Integer maxDepth,String uploadedRevision,boolean verifySources) {}
     public record EvaluationRequest(String nodeId, String scope, Integer maxDepth,
                                     List<String> expectedTargets, Integer topK) {}
 }

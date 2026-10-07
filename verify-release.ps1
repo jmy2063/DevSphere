@@ -31,15 +31,17 @@ if (-not (Test-Path "$Root\demo-output\DevSphere_AX_Report.html")) { throw "Stan
 
 Write-Host "[4/4] Dependency-resolved builds" -ForegroundColor Cyan
 $gradle = Get-Command gradle -ErrorAction SilentlyContinue
-if ($gradle) {
+$GradleRunner = Join-Path $Root 'backend\gradlew.bat'
+if (-not (Test-Path $GradleRunner) -and $gradle) { $GradleRunner = $gradle.Source }
+if (Test-Path $GradleRunner) {
   Push-Location "$Root\backend"
-  try { gradle clean test bootJar --no-daemon; if ($LASTEXITCODE -ne 0) { throw "Gradle build failed." } }
+  try { & $GradleRunner clean test bootJar --no-daemon; if ($LASTEXITCODE -ne 0) { throw "Gradle build failed." } }
   finally { Pop-Location }
   Write-Host "[OK] Backend Gradle test + bootJar" -ForegroundColor Green
 } elseif ($Strict) {
-  throw "Gradle CLI not installed. STRICT verification cannot pass without a dependency-resolved backend build."
+  throw "Gradle Wrapper and CLI are unavailable. STRICT verification requires a dependency-resolved backend build."
 } else {
-  Write-Host "[SKIP] Gradle CLI not installed. Run strict gate on the final presentation PC." -ForegroundColor Yellow
+  Write-Host "[SKIP] Gradle Wrapper and CLI unavailable. Run strict gate on the final presentation PC." -ForegroundColor Yellow
 }
 
 $npm = Get-Command npm -ErrorAction SilentlyContinue

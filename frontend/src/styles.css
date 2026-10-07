@@ -21,3 +21,64 @@
 .evaluation-result p,.evaluation-result small{display:block;margin:7px 0 0;color:#7f9aae;font-size:9px;line-height:1.5}
 @media(max-width:1050px){.metric-panel{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:760px){.github-actions{grid-template-columns:1fr}.eval-metrics{grid-template-columns:repeat(2,1fr)}}
+
+.impact-review{border-top:1px solid #285068;margin-top:14px;padding-top:12px}
+.result-workspace{margin-top:20px}
+.result-workspace:empty{display:none}
+.review-layout{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:24px}
+.risk-details{border-top:1px solid #285068;margin-top:14px;padding-top:12px;min-width:0}
+.risk-details h3{font-size:15px;margin:0 0 10px;color:#e2f8f4}
+.result-workspace .risk{padding:20px}
+.result-workspace .risk-metrics{max-width:640px}
+.result-workspace .explanation{font-size:13px}
+.result-workspace .reason-list span{font-size:11px;line-height:1.5;border-radius:8px}
+.result-workspace .breakdown div{font-size:11px;padding:10px}
+.impact-review h3{font-size:15px;margin:0 0 10px;color:#e2f8f4}
+.impact-review h4{font-size:12px;margin:16px 0 8px;color:#b5ded9}
+.review-counts{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:#a9c1d0}
+.review-counts span{background:#10283a;border:1px solid #285068;border-radius:8px;padding:8px}
+.review-counts b{color:#66e6db;margin-left:5px}
+.review-note{font-size:11px;color:#9bb4c5;line-height:1.6;margin:8px 0}
+.review-details{border:1px solid #285068;border-radius:9px;margin:7px 0;background:#081725;overflow:hidden}
+.review-details summary{font-size:11px;color:#d1e7ed;padding:10px;cursor:pointer;overflow-wrap:anywhere;line-height:1.5}
+.review-details>.review-note{padding:0 10px}
+.review-node{display:flex;flex-direction:column;gap:5px;padding:10px;color:#acc7d7;font-size:11px;overflow-wrap:anywhere}
+.review-node small{font-size:10px;color:#8fbdba}
+.review-node code,.review-steps code{user-select:text;overflow-wrap:anywhere;font-size:10px;white-space:normal}
+.review-button{border:1px solid #38637b;background:#102d40;color:#a3f0e4;border-radius:7px;padding:8px 10px;font-size:11px;cursor:pointer;text-align:left}
+.review-button:hover{background:#17445b}
+.review-details>.review-button{margin:0 10px 10px}
+.review-filters{display:grid;grid-template-columns:minmax(0,1fr) 110px;gap:7px}
+.review-filters input,.path-search{width:100%;min-width:0;border:1px solid #38637b;background:#071521;color:#e3f4ff;border-radius:8px;padding:10px;font-size:11px}
+.review-filters select{font-size:11px;padding:9px}
+.review-steps{padding:0 12px 0 30px;font-size:11px;color:#acd2ce}
+.review-steps li{padding:7px 0;overflow-wrap:anywhere}
+.review-steps b,.review-steps span,.review-steps code{display:block;margin-top:4px}
+.review-steps span{font-size:10px;color:#8faabb}
+.graph-focus-status{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px;color:#a3ded4;font-size:12px}
+.node:focus-visible circle{stroke:#fff;stroke-width:3}
+.review-button:focus-visible,.review-details summary:focus-visible{outline:2px solid #66e6db;outline-offset:2px}
+@media(max-width:650px){.review-filters{grid-template-columns:1fr}.graph-focus-status{align-items:flex-start;flex-direction:column}}
+@media(max-width:900px){.review-layout{grid-template-columns:1fr;gap:8px}}
+
+aside{min-width:0}
+.section-heading{flex-wrap:wrap}
+.section-heading>div{min-width:0;overflow-wrap:anywhere}
+.graph-note{max-width:calc(100% - 24px);overflow-wrap:anywhere}
+.info p{overflow-wrap:anywhere}
+@media(max-width:650px){.workspace{grid-template-columns:minmax(0,1fr)}.section-heading small{max-width:100%}}
+
+.github-url{width:100%;min-width:0;margin-top:9px;border:1px solid #d5e1ef;border-radius:9px;padding:10px;background:#fff;color:#15263d;font-size:12px}
+.github-report{padding:20px;background:#081929;border:1px solid #285068;border-radius:16px}
+.github-report h2{font-size:19px;margin:0 0 14px;overflow-wrap:anywhere}
+.revision-status{display:flex;flex-direction:column;gap:7px;color:#b3d9d5;font-size:12px;overflow-wrap:anywhere}
+.revision-status code{font-size:11px}
+.report-warning{padding:10px;border-left:3px solid #c9a84d;background:#292715;color:#e9d9a0;font-size:12px;line-height:1.6}
+.report-counts{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}
+.report-counts span{padding:10px;background:#102d40;border-radius:9px;font-size:12px;color:#a9c7d6}
+.report-counts b{margin-left:7px;color:#69e5d8}
+.github-report>.review-details{margin:14px 0}
+.github-report>.review-details>.path-search{width:calc(100% - 20px);margin:0 10px 8px}
+.source-verify-choice{display:flex;align-items:center;gap:8px;font-size:12px;margin:8px 0}.source-verify-choice input{width:auto;margin:0}
+.source-verification{border:1px solid #e5b24b;border-radius:12px;padding:14px;margin:16px 0;min-width:0;overflow-wrap:anywhere}
+.source-verification.verified{border-color:#2dc9b8}.source-verification h3{margin:0 0 8px}.source-verification code{display:block;font-size:11px;overflow-wrap:anywhere}

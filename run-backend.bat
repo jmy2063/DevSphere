@@ -14,7 +14,7 @@ if !JMAJOR! LSS 17 (echo [ERROR] JDK 17+ is required. Current major: !JMAJOR!& p
 cd /d "%ROOT%backend" || exit /b 1
 if exist gradlew.bat (
   call gradlew.bat bootRun --no-daemon
-  exit /b %ERRORLEVEL%
+  exit /b !ERRORLEVEL!
 )
 where gradle >nul 2>nul
 if errorlevel 1 (

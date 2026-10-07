@@ -33,11 +33,18 @@ public class GroundTruthEvaluator {
         Set<String> canonicalExpected = new LinkedHashSet<>();
         Map<String,String> expectedToCanonical = new LinkedHashMap<>();
         for (String expected : rawExpected) {
-            String canonical = uniqueNodes.values().stream()
-                    .filter(n -> expected.equals(normalize(n.id())) || expected.equals(normalize(n.name())))
-                    .map(n -> "node:" + normalize(n.id()))
-                    .findFirst()
-                    .orElse("raw:" + expected);
+            // IDs take precedence over display aliases. A name shared by several packages
+            // cannot identify a ground-truth target and must not silently select the first node.
+            List<ImpactResult.ImpactNode> matches = uniqueNodes.values().stream()
+                    .filter(n -> expected.equals(normalize(n.id()))).toList();
+            if (matches.isEmpty()) matches = uniqueNodes.values().stream()
+                    .filter(n -> expected.equals(normalize(n.name()))).toList();
+            if (matches.size() > 1) {
+                throw new IllegalArgumentException("Ambiguous Ground Truth target '" + expected
+                        + "'. Use a Node ID: " + matches.stream().map(ImpactResult.ImpactNode::id)
+                        .collect(java.util.stream.Collectors.joining(", ")));
+            }
+            String canonical = matches.isEmpty() ? "raw:" + expected : "node:" + normalize(matches.get(0).id());
             canonicalExpected.add(canonical);
             expectedToCanonical.put(expected, canonical);
         }

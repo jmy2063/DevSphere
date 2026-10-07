@@ -1,0 +1,32 @@
+# project	scenario	changed	scope	expected targets
+chain	chain-01	A	LOCAL	B,C
+chain	chain-02	A	FEATURE	B,C,D,E
+chain	chain-03	A	SYSTEM	B,C,D,E,F,G
+chain	chain-04	D	LOCAL	B,C,E,F
+chain	chain-05	D	FEATURE	A,B,C,E,F,G
+chain	chain-06	D	SYSTEM	A,B,C,E,F,G
+chain	chain-07	G	LOCAL	E,F
+chain	chain-08	G	FEATURE	C,D,E,F
+chain	chain-09	G	SYSTEM	A,B,C,D,E,F
+chain	chain-10	B	LOCAL	A,C,D
+diamond	diamond-01	A	LOCAL	B,C,D
+diamond	diamond-02	A	FEATURE	B,C,D,E
+diamond	diamond-03	A	SYSTEM	B,C,D,E
+diamond	diamond-04	E	LOCAL	B,C,D
+diamond	diamond-05	E	FEATURE	A,B,C,D
+diamond	diamond-06	E	SYSTEM	A,B,C,D
+diamond	diamond-07	B	LOCAL	A,C,D,E
+diamond	diamond-08	B	FEATURE	A,C,D,E
+diamond	diamond-09	B	SYSTEM	A,C,D,E
+diamond	diamond-10	D	LOCAL	A,B,C,E
+cycle	cycle-01	A	LOCAL	B,C,D
+cycle	cycle-02	A	FEATURE	B,C,D,E,F
+cycle	cycle-03	A	SYSTEM	B,C,D,E,F
+cycle	cycle-04	F	LOCAL	D,E
+cycle	cycle-05	F	FEATURE	A,B,C,D,E
+cycle	cycle-06	F	SYSTEM	A,B,C,D,E
+cycle	cycle-07	C	LOCAL	A,B,D,E
+cycle	cycle-08	C	FEATURE	A,B,D,E,F
+cycle	cycle-09	C	SYSTEM	A,B,D,E,F
+cycle	cycle-10	D	LOCAL	A,B,C,E,F
+
