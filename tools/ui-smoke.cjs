@@ -20,7 +20,7 @@ async function main(){
     const impactNodes=[...methods,test].map((n,i)=>({...n,depth:i<3?1:2,relation:'CALLS',direction:'DOWNSTREAM',endLine:n.line+1}));
     const paths=methods.map((n,i)=>({targetId:n.id,targetName:n.name,targetType:n.type,hopCount:i+1,pathConfidence:.8,steps:[root,...methods.slice(0,i+1)].map(s=>({...s,endLine:s.line+1,viaRelation:'CALLS',direction:'DOWNSTREAM'}))}));
     const result={changedNode:'root',changedNodeName:root.name,scope:'FEATURE',directImpact:impactNodes.slice(0,3),indirectImpact:impactNodes.slice(3),apis:[],entities:[],tests:[test.name],areas:[],riskScore:61,riskLevel:'HIGH',riskReasons:['Fixture review'],riskBreakdown:{'Test Gap':6},evidenceConfidence:.8,blastRadius:1,maxDepth:4,exploredNodes:17,paths,explanation:'브라우저 검증용 고정 응답'};
-    let failImpact=false,reportRequests=0;
+    let failImpact=false,reportRequests=0,expectToken=false;
     const githubReport={kind:'PR',owner:'spring-projects',repo:'spring-petclinic',reference:'42',baseSha:'a'.repeat(40),headSha:'b'.repeat(40),declaredRevision:'',revisionStatus:'UNVERIFIED',mappingSide:'HEAD',warnings:['ZIP 버전 미확인'],files:[{filename:'src/CheckoutService.java',previousFilename:'',changeStatus:'modified',mappingStatus:'MAPPED_METHOD',reason:'HEAD 줄 좌표',startNodeIds:['root']},{filename:'src/Missing.java',previousFilename:'',changeStatus:'removed',mappingStatus:'UNMAPPED',reason:'ZIP에서 해당 파일을 찾지 못했습니다.',startNodeIds:[]}],results:[result],summary:{changedFiles:2,javaFiles:2,methodMappedFiles:1,fallbackFiles:0,unmappedJavaFiles:1,changedStarts:1,uniqueImpactNodes:16,uniqueStructuralNodes:1,maxStartRiskScore:61,tests:[{id:test.id,name:test.name,sourcePath:test.sourcePath,line:8,depth:2,confidence:.9,changedStarts:[root.name]}]}};
     const sourceVerification={status:'VERIFIED',revision:'b'.repeat(40),zipPrefix:'',localFiles:2,repositoryFiles:2,matchedFiles:2,changedFiles:0,missingFiles:0,extraFiles:0,message:'분석 대상 Java 파일 전체의 경로·바이트 내용이 커밋과 일치합니다.',differences:[]};
     await page.route('**/api/**',async route=>{
@@ -34,7 +34,7 @@ async function main(){
       }else if(url.pathname.endsWith('/github-pr-report')){
         reportRequests++;const request=route.request().postDataJSON();
         assert.equal(request.owner,'spring-projects');assert.equal(request.pullNumber,42);
-        assert.equal(route.request().headers()['x-github-token'],'fixture-secret');
+        assert.equal(route.request().headers()['x-github-token'],expectToken?'fixture-secret':undefined);
         assert.equal(JSON.stringify(request).includes('fixture-secret'),false);
         body=request.uploadedRevision?{...githubReport,revisionStatus:'DECLARED_MISMATCH',results:[],summary:{...githubReport.summary,methodMappedFiles:0,unmappedJavaFiles:2,changedStarts:0,uniqueImpactNodes:0,uniqueStructuralNodes:0,maxStartRiskScore:0,tests:[]}}:githubReport;
         if(!request.uploadedRevision&&request.verifySources)body={...githubReport,revisionStatus:'VERIFIED_JAVA_HEAD',warnings:['Java 소스만 검증했습니다.'],sourceVerification};
@@ -44,7 +44,14 @@ async function main(){
     });
     await page.goto(process.env.UI_URL||'http://127.0.0.1:5173');
     await page.locator('input[type=file]').setInputFiles({name:'fixture.zip',mimeType:'application/zip',buffer:Buffer.from('fixture')});
+    await page.getByText('준비 완료 · fixture').waitFor();
+    await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='변경점 분석 입력');
     await page.getByRole('button',{name:'영향 분석',exact:true}).click();
+    await page.getByRole('region',{name:'핵심 분석 결과'}).getByRole('heading',{name:root.name}).waitFor();
+    await page.waitForFunction(()=>document.activeElement?.classList.contains('result-snapshot'));
+    await page.getByRole('region',{name:'핵심 분석 결과'}).getByText(test.name).waitFor();
+    await page.getByRole('button',{name:'상세 결과 보기'}).click();
+    await page.waitForFunction(()=>Math.abs(document.querySelector('#detailed-results').getBoundingClientRect().top)<150);
     await page.getByRole('heading',{name:'이 변경에서 확인할 항목'}).waitFor();
     await page.getByRole('button',{name:'나머지 8개 모두 보기',exact:true}).click();
     assert.equal(await page.locator('.review-details>summary').filter({hasText:'METHOD'}).count(),15);
@@ -69,15 +76,22 @@ async function main(){
     await page.screenshot({path:path.join(output,'review-desktop.png'),fullPage:true});
     await page.setViewportSize({width:390,height:844});
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Mobile page must not overflow horizontally');
+    assert.equal(await page.locator('.workspace aside').evaluate(el=>el.getBoundingClientRect().top<document.querySelector('.graph-section').getBoundingClientRect().top),true,'Analysis controls should precede the graph on mobile');
     await page.screenshot({path:path.join(output,'review-mobile.png'),fullPage:true});
     failImpact=true;
     await page.getByRole('button',{name:'영향 분석',exact:true}).click();
     await page.getByText('Fixture request failed').waitFor();
     assert.equal(await page.getByRole('heading',{name:'이 변경에서 확인할 항목'}).count(),0,'A failed rerun must not leave a stale report');
+    assert.equal(await page.locator('.result-snapshot').count(),0,'A failed rerun must not leave a stale summary');
     await page.locator('.github-box>summary').click();
     await page.getByLabel('GitHub PR 주소').fill('https://github.com/spring-projects/spring-petclinic/pull/42/files');
-    await page.getByPlaceholder('Token (Private repo만)').fill('fixture-secret');
     await page.getByRole('button',{name:'PR 변경 Method 분석',exact:true}).click();
+    await page.getByRole('region',{name:'핵심 분석 결과'}).getByRole('heading',{name:'PR #42'}).waitFor();
+    await page.locator('.github-advanced>summary').click();
+    await page.getByPlaceholder('Token (Private repo만)').fill('fixture-secret');
+    expectToken=true;
+    await page.getByRole('button',{name:'PR 변경 Method 분석',exact:true}).click();
+    await page.getByRole('region',{name:'핵심 분석 결과'}).getByRole('heading',{name:'PR #42'}).waitFor();
     await page.getByRole('heading',{name:/PR 분석 요약/}).waitFor();
     await page.getByText('Java 소스 검증 완료 · HEAD',{exact:true}).waitFor();
     await page.getByLabel('변경 파일 검색').fill('Missing');
@@ -89,6 +103,7 @@ async function main(){
     await page.getByRole('button',{name:'PR 변경 Method 분석',exact:true}).click();
     await page.getByText('입력한 커밋: 버전 불일치',{exact:true}).waitFor();
     assert.equal(await page.locator('.github-report').count(),1,'Zero mapped starts must still show the report');
+    await page.getByRole('region',{name:'핵심 분석 결과'}).getByText('산출 안 됨').waitFor();
     await page.screenshot({path:path.join(output,'github-report-mobile.png'),fullPage:true});
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     await page.getByLabel('ZIP 커밋 SHA').fill('b'.repeat(40));
@@ -101,7 +116,7 @@ async function main(){
     await page.getByText('ZIP 버전 미확인 · HEAD 가정',{exact:true}).waitFor();
     await page.getByLabel('GitHub PR 주소').fill('https://github.com.evil.test/a/b/pull/42');
     await page.getByRole('button',{name:'PR 변경 Method 분석',exact:true}).click();
-    await page.waitForTimeout(100);assert.equal(reportRequests,4,'Invalid URLs must not reach the API');
+    await page.waitForTimeout(100);assert.equal(reportRequests,5,'Invalid URLs must not reach the API');
     assert.deepEqual(errors,[]);
     console.log('PASS: review, PR URL, mapping search, zero-start report, token-free export, mobile layout and stale-error state; mocked API');
   }finally{await browser.close()}

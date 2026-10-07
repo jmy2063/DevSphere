@@ -1,4 +1,4 @@
-import {DragEvent,useEffect,useMemo,useState,type ReactNode} from 'react';
+import {DragEvent,useEffect,useMemo,useRef,useState,type ReactNode} from 'react';
 import {
   Activity,AlertTriangle,BarChart3,Download,FileCode2,GitBranch,Github,Layers3,
   Network,Search,ShieldCheck,UploadCloud
@@ -6,6 +6,7 @@ import {
 import GraphView from './components/GraphView';
 import ImpactReview from './components/ImpactReview';
 import GithubReportPanel from './components/GithubReportPanel';
+import ResultSnapshot from './components/ResultSnapshot';
 import {parseGithubPrUrl} from './lib/github-url';
 import {
   evaluateGroundTruth,githubChangeReport,health,impact,impactComparison,uploadZip,
@@ -29,6 +30,7 @@ export default function App(){
   const [verifySources,setVerifySources]=useState(true);
   const [evaluation,setEvaluation]=useState<Evaluation|null>(null);
   const [busy,setBusy]=useState(false);
+  const [busyLabel,setBusyLabel]=useState('');
   const [dragging,setDragging]=useState(false);
   const [error,setError]=useState('');
   const [query,setQuery]=useState('');
@@ -41,8 +43,26 @@ export default function App(){
   const [token,setToken]=useState('');
   const [groundTruth,setGroundTruth]=useState('');
   const [focusedPath,setFocusedPath]=useState<string[]>([]);
+  const snapshotRef=useRef<HTMLElement>(null);
+  const analysisRef=useRef<HTMLElement>(null);
 
   useEffect(()=>{health().then(setServer).catch(()=>setServer(null))},[]);
+  useEffect(()=>{
+    if(!summary)return;
+    const frame=requestAnimationFrame(()=>{
+      analysisRef.current?.scrollIntoView({behavior:'smooth',block:'start'});
+      analysisRef.current?.focus({preventScroll:true});
+    });
+    return ()=>cancelAnimationFrame(frame);
+  },[summary]);
+  useEffect(()=>{
+    if(!result&&!comparison&&!prReport)return;
+    const frame=requestAnimationFrame(()=>{
+      snapshotRef.current?.scrollIntoView({behavior:'smooth',block:'start'});
+      snapshotRef.current?.focus({preventScroll:true});
+    });
+    return ()=>cancelAnimationFrame(frame);
+  },[result,comparison,prReport]);
   const candidates=useMemo(()=>{
     const all=summary?.nodes.filter(n=>['CONTROLLER','SERVICE','REPOSITORY','ENTITY','METHOD'].includes(n.type))||[];
     const q=query.trim().toLowerCase();
@@ -57,43 +77,43 @@ export default function App(){
 
   async function analyzeFile(file:File){
     if(busy)return;
-    setBusy(true);setError('');clearOutputs();
+    setBusy(true);setBusyLabel('프로젝트를 분석하고 있습니다…');setError('');clearOutputs();
     try{
       const next=await uploadZip(file);setSummary(next);setUploadedRevision('');
       const first=next.nodes.find(n=>n.type==='SERVICE')?.id||next.nodes.find(n=>n.type==='CONTROLLER')?.id||next.nodes[0]?.id||'';
       setSelected(first);
-    }catch(e){setError(messageOf(e))}finally{setBusy(false)}
+    }catch(e){setError(messageOf(e))}finally{setBusy(false);setBusyLabel('')}
   }
   async function runImpact(){
-    if(!summary||!selected||busy)return;setBusy(true);setError('');clearOutputs();
-    try{setResult(await impact(summary.projectId,selected,scope,scopeInfo[scope].depth))}catch(e){setError(messageOf(e))}finally{setBusy(false)}
+    if(!summary||!selected||busy)return;setBusy(true);setBusyLabel('영향 경로를 분석하고 있습니다…');setError('');clearOutputs();
+    try{setResult(await impact(summary.projectId,selected,scope,scopeInfo[scope].depth))}catch(e){setError(messageOf(e))}finally{setBusy(false);setBusyLabel('')}
   }
   async function runComparison(){
-    if(!summary||!selected||busy)return;setBusy(true);setError('');clearOutputs();
-    try{setComparison(await impactComparison(summary.projectId,selected))}catch(e){setError(messageOf(e))}finally{setBusy(false)}
+    if(!summary||!selected||busy)return;setBusy(true);setBusyLabel('분석 범위를 비교하고 있습니다…');setError('');clearOutputs();
+    try{setComparison(await impactComparison(summary.projectId,selected))}catch(e){setError(messageOf(e))}finally{setBusy(false);setBusyLabel('')}
   }
   async function runPr(){
-    if(!summary||busy)return;setBusy(true);setError('');clearOutputs();
+    if(!summary||busy)return;setBusy(true);setBusyLabel('PR 변경과 영향 경로를 분석하고 있습니다…');setError('');clearOutputs();
     try{
       const number=Number(pr);
       const target=prUrl.trim()?parseGithubPrUrl(prUrl):{owner,repo,pullNumber:number};
       setOwner(target.owner);setRepo(target.repo);setPr(String(target.pullNumber));
       setPrReport(await githubChangeReport(summary.projectId,{...target,scope,maxDepth:scopeInfo[scope].depth,uploadedRevision,verifySources},token));
-    }catch(e){setError(messageOf(e))}finally{setBusy(false)}
+    }catch(e){setError(messageOf(e))}finally{setBusy(false);setBusyLabel('')}
   }
   async function runCommit(){
-    if(!summary||busy)return;setBusy(true);setError('');clearOutputs();
+    if(!summary||busy)return;setBusy(true);setBusyLabel('Commit 변경과 영향 경로를 분석하고 있습니다…');setError('');clearOutputs();
     try{
       setPrReport(await githubChangeReport(summary.projectId,{owner,repo,sha:commitSha,scope,maxDepth:scopeInfo[scope].depth,uploadedRevision,verifySources},token));
-    }catch(e){setError(messageOf(e))}finally{setBusy(false)}
+    }catch(e){setError(messageOf(e))}finally{setBusy(false);setBusyLabel('')}
   }
   async function runEvaluation(){
     if(!summary||!selected)return;
     const expected=groundTruth.split(/\r?\n|,/).map(x=>x.trim()).filter(Boolean);
     if(!expected.length){setError('Ground Truth 대상 이름 또는 Node ID를 한 줄에 하나씩 입력해주세요.');return}
-    setBusy(true);setError('');setEvaluation(null);
+    setBusy(true);setBusyLabel('Ground Truth를 평가하고 있습니다…');setError('');setEvaluation(null);
     try{setEvaluation(await evaluateGroundTruth(summary.projectId,selected,scope,scopeInfo[scope].depth,expected,5))}
-    catch(e){setError(messageOf(e))}finally{setBusy(false)}
+    catch(e){setError(messageOf(e))}finally{setBusy(false);setBusyLabel('')}
   }
   function focusPath(ids:string[]){
     setFocusedPath(ids);
@@ -114,16 +134,26 @@ export default function App(){
       <div className="header-right"><div className={`status ${server?'online':'offline'}`}><Activity size={15}/>{server?'Backend Connected':'Backend Offline'}</div><div className="mvp">Java 17 · Spring Boot · GitHub PR/Commit · Method Path · CRI</div></div>
     </header>
 
-    {error&&<div className="error-banner"><AlertTriangle size={18}/><span>{error}</span><button onClick={()=>setError('')}>닫기</button></div>}
+    {error&&<div className="error-banner" role="alert"><AlertTriangle size={18}/><span>{error}</span><button onClick={()=>setError('')}>닫기</button></div>}
     {summary?.warnings?.map((w,i)=><div className="warning-banner" key={i}>{w}</div>)}
+    <div className="flow-progress" aria-label="분석 진행 단계">
+      <span className={summary?'done':'current'}><b>1</b> 프로젝트 ZIP 업로드</span>
+      <span className={summary&&(result||comparison||prReport)?'done':summary?'current':''}><b>2</b> 변경 메서드 또는 PR 선택</span>
+      <span className={result||comparison||prReport?'current':''}><b>3</b> 결과와 근거 확인</span>
+    </div>
+    {busyLabel&&<p className="flow-status" role="status">{busyLabel}</p>}
 
     <section className="top-grid">
       <div className={`panel uploader ${dragging?'dragging':''}`} onDragOver={e=>{e.preventDefault();setDragging(true)}} onDragLeave={()=>setDragging(false)} onDrop={drop}>
-        <div className="icon-box"><UploadCloud size={28}/></div><div><h2>Spring 프로젝트 분석</h2><p>ZIP → AST → Method/Class/API/DB/Test Graph → 광역 변경 리스크 분석</p></div>
-        <label className="upload-button">{busy?'분석 중…':'ZIP 선택'}<input type="file" accept=".zip" disabled={busy} onChange={e=>e.target.files?.[0]&&void analyzeFile(e.target.files[0])}/></label>
+        <div className="icon-box"><UploadCloud size={28}/></div><div><h2>1. Spring 프로젝트 업로드</h2><p>{summary?`준비 완료 · ${summary.projectId}`:'Java/Spring 프로젝트 ZIP을 선택하세요. 업로드 후 변경 메서드 또는 PR을 분석할 수 있습니다.'}</p></div>
+        <label className="upload-button">{busy?'처리 중…':summary?'다른 ZIP 선택':'ZIP 선택'}<input type="file" accept=".zip" disabled={busy} onChange={e=>e.target.files?.[0]&&void analyzeFile(e.target.files[0])}/></label>
       </div>
-      <div className="panel metric-panel"><Metric label="Classes" value={summary?.analyzedClasses||0}/><Metric label="Nodes" value={summary?.nodeCount||0}/><Metric label="Edges" value={summary?.edgeCount||0}/><Metric label="Methods" value={summary?.methods||0}/><Metric label="APIs" value={summary?.apis||0}/><Metric label="Analyze" value={summary?`${summary.analysisDurationMs}ms`:'0ms'}/></div>
+      {summary?<div className="panel metric-panel"><Metric label="Classes" value={summary.analyzedClasses}/><Metric label="Nodes" value={summary.nodeCount}/><Metric label="Edges" value={summary.edgeCount}/><Metric label="Methods" value={summary.methods}/><Metric label="APIs" value={summary.apis}/><Metric label="Analyze" value={`${summary.analysisDurationMs}ms`}/></div>:<div className="panel metric-empty"><Network size={26}/><b>분석 준비</b><span>ZIP을 업로드하면 프로젝트 구조와 분석 대상을 보여드립니다.</span></div>}
     </section>
+
+    {(result||comparison||prReport)&&<section ref={snapshotRef} tabIndex={-1} className="result-snapshot" aria-label="핵심 분석 결과">
+      <ResultSnapshot result={result} comparison={comparison} report={prReport} scope={scope} onDetails={()=>document.getElementById('detailed-results')?.scrollIntoView({behavior:'smooth',block:'start'})}/>
+    </section>}
 
     <section className="workspace">
       <div className="graph-section">
@@ -132,27 +162,35 @@ export default function App(){
         {summary?<GraphView nodes={summary.nodes} edges={summary.edges} selected={selected} focusIds={focusedPath} onSelect={id=>{if(!busy){setSelected(id);clearOutputs()}}}/>:<Empty/>}
       </div>
 
-      <aside>
-        <div className="section-heading"><div><GitBranch/><span>Wide-Scope Change Risk Analysis</span></div>{summary&&(result||comparison||prReport||evaluation)&&<button className="icon-action" onClick={exportReport} title="JSON 결과 저장"><Download size={16}/></button>}</div>
-        <label className="field-label">분석 대상 검색</label><div className="search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Method, Service, Controller…" disabled={!summary||busy}/></div>
-        <label className="field-label">변경 시작점</label><select value={selected} onChange={e=>{setSelected(e.target.value);clearOutputs()}} disabled={!summary||busy}>{candidates.map(n=><option key={n.id} value={n.id}>{n.type} · {n.name}</option>)}</select>
-        <label className="field-label">분석 범위</label>
-        <select value={scope} onChange={e=>{setScope(e.target.value as AnalysisScope);clearOutputs()}} disabled={busy}>
+      <aside ref={analysisRef} tabIndex={-1} aria-label="변경점 분석 입력">
+        <div className="section-heading"><div><GitBranch/><span>2. 변경점 선택</span></div>{summary&&(result||comparison||prReport||evaluation)&&<button className="icon-action" onClick={exportReport} title="JSON 결과 저장" aria-label="JSON 결과 저장"><Download size={16}/></button>}</div>
+        <p className="analysis-intro">메서드를 직접 선택하거나 아래에 GitHub PR 주소를 붙여 넣으세요.</p>
+        <label className="field-label" htmlFor="node-query">분석 대상 검색</label><div className="search"><Search size={16}/><input id="node-query" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Method, Service, Controller…" disabled={!summary||busy}/></div>
+        <label className="field-label" htmlFor="selected-node">변경 시작점</label><select id="selected-node" value={selected} onChange={e=>{setSelected(e.target.value);clearOutputs()}} disabled={!summary||busy}>{candidates.map(n=><option key={n.id} value={n.id}>{n.type} · {n.name}</option>)}</select>
+        <label className="field-label" htmlFor="analysis-scope">분석 범위</label>
+        <select id="analysis-scope" value={scope} onChange={e=>{setScope(e.target.value as AnalysisScope);clearOutputs()}} disabled={busy}>
           {(Object.keys(scopeInfo) as AnalysisScope[]).map(k=><option value={k} key={k}>{scopeInfo[k].label} — {scopeInfo[k].desc}</option>)}
         </select>
         <div className="action-row"><button className="run scope-run" onClick={()=>void runImpact()} disabled={!selected||busy}>{busy?'분석 중…':scope==='SYSTEM'?'광역 리스크 분석':'영향 분석'}</button><button className="secondary-run" onClick={()=>void runComparison()} disabled={!selected||busy}><BarChart3 size={15}/>3단계 비교</button></div>
         {selectedNode&&<div className="selected-meta"><FileCode2 size={15}/><div><b>{selectedNode.name}</b><span>{selectedNode.sourcePath||'source path 없음'} · L{selectedNode.line}{selectedNode.attributes?.endLine?`–${selectedNode.attributes.endLine}`:''}</span></div></div>}
 
         <details className="github-box">
-          <summary><Github size={16}/>GitHub PR / Commit → 변경 Method 자동 분석</summary>
-          <input className="github-url" aria-label="GitHub PR 주소" placeholder="https://github.com/owner/repo/pull/123" value={prUrl} onChange={e=>setPrUrl(e.target.value)} disabled={busy}/>
-          <input className="github-url" aria-label="ZIP 커밋 SHA" placeholder="ZIP의 전체 커밋 SHA (선택, 40자리)" value={uploadedRevision} onChange={e=>setUploadedRevision(e.target.value.trim())} disabled={busy}/>
-          <small>ZIP 커밋은 사용자 입력이며 파일 내용 일치를 증명하지 않습니다.</small>
-          <label className="source-verify-choice"><input type="checkbox" checked={verifySources} onChange={e=>setVerifySources(e.target.checked)} disabled={busy}/>Java 소스 내용 검증</label>
-          <small>{verifySources?'저장소의 분석 대상 Java 전체와 비교합니다. 불일치·검증 불가는 분석을 중단합니다. SHA 미입력 시 HEAD와 비교합니다.':'내용 검증을 생략합니다. ZIP 버전은 사용자 선언 또는 HEAD 가정으로 표시합니다.'}</small>
-          <div className="github-grid"><input placeholder="owner" value={owner} onChange={e=>setOwner(e.target.value)}/><input placeholder="repository" value={repo} onChange={e=>setRepo(e.target.value)}/><input placeholder="PR 번호" inputMode="numeric" value={pr} onChange={e=>setPr(e.target.value.replace(/\D/g,''))}/><input type="password" placeholder="Token (Private repo만)" value={token} onChange={e=>setToken(e.target.value)}/></div>
-          <div className="github-actions"><button className="pr-run" disabled={!summary||busy||(!pr&&!prUrl.trim())} onClick={()=>void runPr()}>PR 변경 Method 분석</button><input className="sha-input" placeholder="Commit SHA" value={commitSha} onChange={e=>setCommitSha(e.target.value.trim())}/><button className="pr-run" disabled={!summary||busy||!commitSha} onClick={()=>void runCommit()}>Commit 분석</button></div>
-          <small>버전과 파일별 매핑 결과를 보고서에 표시합니다. Token은 브라우저 메모리에만 유지되며 결과 JSON에는 저장하지 않습니다.</small>
+          <summary><Github size={16}/>GitHub PR 주소로 분석</summary>
+          <label className="github-label" htmlFor="github-pr-url">GitHub PR 주소</label>
+          <input id="github-pr-url" className="github-url" placeholder="https://github.com/owner/repo/pull/123" value={prUrl} onChange={e=>setPrUrl(e.target.value)} disabled={busy}/>
+          <button className="pr-run github-primary" disabled={!summary||busy||(!pr&&!prUrl.trim())} onClick={()=>void runPr()}>PR 변경 Method 분석</button>
+          <small>프로젝트 ZIP을 먼저 올려주세요. Java 소스 내용 검증은 기본으로 켜져 있습니다.</small>
+          <details className="github-advanced">
+            <summary>고급 옵션 · 버전, 비공개 저장소, Commit</summary>
+            <label className="github-label" htmlFor="zip-revision">ZIP 커밋 SHA</label>
+            <input id="zip-revision" className="github-url" placeholder="ZIP의 전체 커밋 SHA (선택, 40자리)" value={uploadedRevision} onChange={e=>setUploadedRevision(e.target.value.trim())} disabled={busy}/>
+            <small>ZIP 커밋은 사용자 입력이며 파일 내용 일치를 증명하지 않습니다.</small>
+            <label className="source-verify-choice"><input type="checkbox" checked={verifySources} onChange={e=>setVerifySources(e.target.checked)} disabled={busy}/>Java 소스 내용 검증</label>
+            <small>{verifySources?'저장소의 분석 대상 Java 전체와 비교합니다. 불일치·검증 불가는 분석을 중단합니다. SHA 미입력 시 HEAD와 비교합니다.':'내용 검증을 생략합니다. ZIP 버전은 사용자 선언 또는 HEAD 가정으로 표시합니다.'}</small>
+            <div className="github-grid"><input aria-label="GitHub owner" placeholder="owner" value={owner} onChange={e=>setOwner(e.target.value)}/><input aria-label="GitHub repository" placeholder="repository" value={repo} onChange={e=>setRepo(e.target.value)}/><input aria-label="PR 번호" placeholder="PR 번호" inputMode="numeric" value={pr} onChange={e=>setPr(e.target.value.replace(/\D/g,''))}/><input aria-label="GitHub Token" type="password" placeholder="Token (Private repo만)" value={token} onChange={e=>setToken(e.target.value)}/></div>
+            <div className="github-actions"><input className="sha-input" aria-label="Commit SHA" placeholder="Commit SHA" value={commitSha} onChange={e=>setCommitSha(e.target.value.trim())}/><button className="pr-run" disabled={!summary||busy||!commitSha} onClick={()=>void runCommit()}>Commit 분석</button></div>
+            <small>Token은 브라우저 메모리에만 유지되며 결과 JSON에는 저장하지 않습니다.</small>
+          </details>
         </details>
 
         <details className="evaluation-box">
@@ -164,7 +202,7 @@ export default function App(){
         {!result&&!comparison&&!prReport&&<div className="result-placeholder"><ShieldCheck size={30}/><b>Evidence-based Change Risk Index</b><span>장애 확률을 임의로 예측하지 않고, 실제 Graph 경로·영향 표면·결합도·테스트 공백을 근거로 0–100 상대 위험지수를 계산합니다.</span></div>}
       </aside>
     </section>
-    <section className="result-workspace" aria-label="분석 결과">
+    <section id="detailed-results" className="result-workspace" aria-label="상세 분석 결과">
       {result?<RiskPanel result={result} onFocus={focusPath}/>:comparison?<ComparisonPanel value={comparison} onFocus={focusPath}/>:prReport?<GithubReportPanel report={prReport}><PrPanel rows={prReport.results} onFocus={focusPath}/></GithubReportPanel>:null}
     </section>
     <footer>AST → Method-level Graph → Confidence-weighted Traversal → Blast Radius → Change Risk Index → Ground Truth Metrics → Grounded AI Explanation</footer>
