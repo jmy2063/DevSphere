@@ -11,3 +11,5 @@ if ($LASTEXITCODE -ne 0) { throw 'Public source benchmark failed' }
 if ($LASTEXITCODE -ne 0) { throw 'Reviewed impact benchmark compilation failed' }
 & java '-Dfile.encoding=UTF-8' -cp $publicBuild ReviewedImpactBenchmark $PSScriptRoot
 if ($LASTEXITCODE -ne 0) { throw 'Reviewed impact contract failed' }
+& java '-Dfile.encoding=UTF-8' -cp $publicBuild ReviewedImpactBenchmark $PSScriptRoot '--dataset=benchmarks/real-changes' '--output-prefix=real-change'
+if ($LASTEXITCODE -ne 0) { throw 'Real change impact contract failed' }

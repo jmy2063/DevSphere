@@ -1,0 +1,8 @@
+case	expectation	target	predicted	pass	depth	confidence	evidence-file	evidence-line
+vet-html-redirect	INCLUDE	api:GET:/vets.html	true	true	1	0.921	src/main/java/org/springframework/samples/petclinic/vet/VetController.java	51
+vet-html-redirect	INCLUDE	org.springframework.samples.petclinic.vet.VetControllerTests	true	true	1	0.796	src/test/java/org/springframework/samples/petclinic/vet/VetControllerTests.java	95
+vet-html-redirect	EXCLUDE	api:GET:/vets	true	false	1	0.912	src/main/java/org/springframework/samples/petclinic/vet/VetController.java	73
+owner-search-redirect	INCLUDE	api:GET:/owners	true	true	1	0.921	src/main/java/org/springframework/samples/petclinic/owner/OwnerController.java	113
+owner-search-redirect	INCLUDE	org.springframework.samples.petclinic.owner.OwnerControllerTests	true	true	1	0.796	src/test/java/org/springframework/samples/petclinic/owner/OwnerControllerTests.java	182
+owner-search-redirect	EXCLUDE	api:GET:/owners/new	true	false	1	0.912	src/main/java/org/springframework/samples/petclinic/owner/OwnerController.java	73
+owner-search-redirect	EXCLUDE	api:GET:/owners/find	true	false	1	0.912	src/main/java/org/springframework/samples/petclinic/owner/OwnerController.java	90

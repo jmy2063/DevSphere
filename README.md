@@ -33,6 +33,10 @@ ZIP 커밋 SHA가 base/head와 다르면 분석을 중단하며, SHA는 사용�
 개별 영향·범위 비교·PR/Commit·기대 대상 평가, 소스 검증 상태와 근거 경로를 포함합니다.
 사용법과 검증 결과는 `docs/HTML_REVIEW_REPORT_2026_10_15.md`에 있습니다.
 
+실제 Petclinic 페이지 범위 수정 커밋에서도 변경 메서드 2개·명시적 대상 7개를 검토했습니다.
+같은 컨트롤러의 별도 API로 퍼지던 오탐 3개를 수정했으며, 원본 patch 검증과 회귀 검사를 CI에 추가했습니다.
+범위와 남은 미판정 후보는 [실제 커밋 검토 기록](benchmarks/real-changes/README.md)에 있습니다. 독립적인 사람 검수는 아직 남아 있습니다.
+
 ## 4.0에서 강화된 품질 항목
 
 - Core regression **62 assertions PASS**

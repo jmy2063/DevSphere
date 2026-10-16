@@ -7,3 +7,4 @@ javac --release 17 -encoding UTF-8 -cp "$ROOT/.benchmark-build" -d "$ROOT/.bench
 java -Dfile.encoding=UTF-8 -cp "$ROOT/.benchmark-build" PublicSourceBenchmark "$ROOT"
 javac --release 17 -encoding UTF-8 -cp "$ROOT/.benchmark-build" -d "$ROOT/.benchmark-build" "$ROOT/tools/ReviewedImpactBenchmark.java"
 java -Dfile.encoding=UTF-8 -cp "$ROOT/.benchmark-build" ReviewedImpactBenchmark "$ROOT"
+java -Dfile.encoding=UTF-8 -cp "$ROOT/.benchmark-build" ReviewedImpactBenchmark "$ROOT" --dataset=benchmarks/real-changes --output-prefix=real-change

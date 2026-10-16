@@ -14,8 +14,13 @@ public class ReviewedImpactBenchmark {
         Path root=Path.of(args.length>0?args[0]:".").toAbsolutePath().normalize();
         boolean baseline=Arrays.asList(args).contains("--record-baseline");
         Path output=root.resolve("benchmark-output");Files.createDirectories(output);
-        List<String[]> cases=rows(root.resolve("benchmarks/reviewed/cases.tsv"),6);
-        List<String[]> labels=rows(root.resolve("benchmarks/reviewed/labels.tsv"),6);
+        String dataset=Arrays.stream(args).filter(a->a.startsWith("--dataset=")).map(a->a.substring("--dataset=".length())).findFirst().orElse("benchmarks/reviewed");
+        String prefix=Arrays.stream(args).filter(a->a.startsWith("--output-prefix=")).map(a->a.substring("--output-prefix=".length())).findFirst().orElse("reviewed");
+        if(!prefix.matches("[a-z0-9-]+"))throw new IllegalArgumentException("Invalid output prefix");
+        Path datasetPath=root.resolve(dataset).normalize();
+        if(!datasetPath.startsWith(root))throw new IllegalArgumentException("Dataset escapes project root");
+        List<String[]> cases=rows(datasetPath.resolve("cases.tsv"),6);
+        List<String[]> labels=rows(datasetPath.resolve("labels.tsv"),6);
         Set<String> caseIds=new HashSet<>();
         for(var c:cases)if(!caseIds.add(c[0]))throw new IllegalArgumentException("Duplicate case "+c[0]);
         if(cases.isEmpty()||labels.isEmpty())throw new IllegalArgumentException("No reviewed cases or labels");
@@ -73,12 +78,12 @@ public class ReviewedImpactBenchmark {
             provenance.add(c[0]+"\t"+c[1]+"\t"+actualCommit);
             System.out.println(c[0]+": labelled TP="+tp+" FP="+fp+" FN="+fn+" TN="+tn+"; unlabelled="+unlabelled+"; tests="+result.tests().size()+"; CRI="+result.riskScore());
         }
-        for(String file:List.of("backend/src/main/java/com/devsphere/ax/impact/ImpactAnalyzer.java","benchmarks/reviewed/cases.tsv","benchmarks/reviewed/labels.tsv"))
+        for(String file:List.of("backend/src/main/java/com/devsphere/ax/impact/ImpactAnalyzer.java",root.relativize(datasetPath.resolve("cases.tsv")).toString().replace('\\','/'),root.relativize(datasetPath.resolve("labels.tsv")).toString().replace('\\','/')))
             provenance.add("sha256\t"+file+"\t"+HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(root.resolve(file)))));
-        Files.write(output.resolve("reviewed-label-results.tsv"),results,StandardCharsets.UTF_8);
-        Files.write(output.resolve("reviewed-summary.tsv"),summary,StandardCharsets.UTF_8);
-        Files.write(output.resolve("reviewed-predictions.tsv"),predictions,StandardCharsets.UTF_8);
-        Files.write(output.resolve("reviewed-provenance.tsv"),provenance,StandardCharsets.UTF_8);
+        Files.write(output.resolve(prefix+"-label-results.tsv"),results,StandardCharsets.UTF_8);
+        Files.write(output.resolve(prefix+"-summary.tsv"),summary,StandardCharsets.UTF_8);
+        Files.write(output.resolve(prefix+"-predictions.tsv"),predictions,StandardCharsets.UTF_8);
+        Files.write(output.resolve(prefix+"-provenance.tsv"),provenance,StandardCharsets.UTF_8);
         System.out.println("Reviewed source contracts: "+cases.size()+" cases / "+total+" labels / "+failures+" failures. Metrics apply only to labelled targets; independent human review is pending.");
         if(failures>0&&!baseline)throw new AssertionError("Reviewed source contract regression: "+failures);
     }

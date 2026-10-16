@@ -1,0 +1,3 @@
+# case	project	commit	changed	scope	change-contract
+vet-html-redirect	spring-petclinic	500158f732419217507c7656904b8e6aa1bcc0d6	org.springframework.samples.petclinic.vet.VetController#VetController.showVetList(int, Model, RedirectAttributes)	LOCAL	Actual 500158f vs 0d064b0: out-of-bounds HTML pagination redirects; JSON handler unchanged
+owner-search-redirect	spring-petclinic	500158f732419217507c7656904b8e6aa1bcc0d6	org.springframework.samples.petclinic.owner.OwnerController#OwnerController.processFindForm(int, Owner, BindingResult, Model, RedirectAttributes)	LOCAL	Actual 500158f vs 0d064b0: owner search pagination redirects preserving lastName; new/find form handlers unchanged

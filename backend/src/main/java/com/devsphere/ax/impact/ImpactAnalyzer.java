@@ -73,6 +73,12 @@ public class ImpactAnalyzer {
             if (current.depth() >= maxDepth) continue;
 
             for (Adjacent adjacent : adjacentForImpact(graph, current.id())) {
+                // A method's zero-cost controller anchor is not evidence that every
+                // sibling handler changed. Known APIs remain reachable through their
+                // HANDLED_BY method and actual CALLS paths; unmapped APIs keep fallback.
+                if (startingAnchors.contains(current.id()) && "EXPOSES".equals(adjacent.baseRelation())
+                        && graph.outgoing(adjacent.nextId()).stream().anyMatch(e -> "HANDLED_BY".equals(e.type())
+                        && graph.outgoing(current.id()).stream().anyMatch(d -> "DECLARES".equals(d.type()) && d.target().equals(e.target())))) continue;
                 GraphNode nextNode = graph.node(adjacent.nextId()).orElse(null);
                 if (nextNode == null || nextNode.type() == NodeType.PROJECT || nextNode.type() == NodeType.PACKAGE) continue;
 
