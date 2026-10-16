@@ -82,5 +82,10 @@ class GithubChangeReportTest {
         var verified=new SourceVerification("VERIFIED",BASE,"",1,1,1,0,0,0,"match",List.of());
         var base=run(graph(),BASE,files,verified);
         assertEquals("VERIFIED_JAVA_BASE",base.revisionStatus());assertEquals(List.of("old"),base.files().get(0).startNodeIds());
+        var autoBase=run(graph(),"",files,verified);
+        assertEquals("VERIFIED_JAVA_BASE",autoBase.revisionStatus());assertEquals("BASE",autoBase.mappingSide());
+        assertEquals("",autoBase.declaredRevision());assertEquals(List.of("old"),autoBase.files().get(0).startNodeIds());
+        var wrongDeclaration=run(graph(),HEAD,files,verified);
+        assertTrue(wrongDeclaration.results().isEmpty());assertEquals("JAVA_VERIFICATION_UNAVAILABLE",wrongDeclaration.revisionStatus());
     }
 }

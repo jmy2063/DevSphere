@@ -1,0 +1,22 @@
+case	expectation	target	predicted	pass	depth	confidence	evidence-file	evidence-line
+rest-greeting	INCLUDE	api:GET:/greeting	true	true	1	0.921	src/main/java/com/example/restservice/GreetingController.java	15
+rest-greeting	INCLUDE	com.example.restservice.Greeting	true	true	1	0.831	src/main/java/com/example/restservice/GreetingController.java	17
+rest-greeting	INCLUDE	com.example.restservice.GreetingControllerTests	true	true	1	0.796	src/test/java/com/example/restservice/GreetingControllerTests.java	24
+rest-greeting	EXCLUDE	com.example.restservice.RestServiceApplication#RestServiceApplication.main(String[])	false	true			src/main/java/com/example/restservice/RestServiceApplication.java	10
+jpa-last-name	INCLUDE	com.example.accessingdatajpa.AccessingDataJpaApplication#AccessingDataJpaApplication.demo(CustomerRepository)	true	true	1	0.884	src/main/java/com/example/accessingdatajpa/AccessingDataJpaApplication.java	47
+jpa-last-name	INCLUDE	com.example.accessingdatajpa.Customer	true	true	1	0.839	src/main/java/com/example/accessingdatajpa/CustomerRepository.java	7
+jpa-last-name	INCLUDE	table:customer	true	true	2	0.719	src/main/java/com/example/accessingdatajpa/Customer.java	8
+jpa-last-name	INCLUDE	com.example.accessingdatajpa.CustomerRepositoryTests	true	true	1	0.875	src/test/java/com/example/accessingdatajpa/CustomerRepositoryTests.java	42
+jpa-last-name	INCLUDE	com.example.accessingdatajpa.CustomerRepositoryTests#CustomerRepositoryTests.testFindByLastName()	true	true	1	0.884	src/test/java/com/example/accessingdatajpa/CustomerRepositoryTests.java	38
+jpa-last-name	EXCLUDE	com.example.accessingdatajpa.Customer#Customer.getLastName()	false	true			src/test/java/com/example/accessingdatajpa/CustomerRepositoryTests.java	42
+jpa-last-name	EXCLUDE	com.example.accessingdatajpa.AccessingDataJpaApplication#AccessingDataJpaApplication.main(String[])	false	true			src/main/java/com/example/accessingdatajpa/AccessingDataJpaApplication.java	16
+petclinic-vet-query	INCLUDE	org.springframework.samples.petclinic.vet.VetController#VetController.findPaginated(int)	true	true	1	0.884	src/main/java/org/springframework/samples/petclinic/vet/VetController.java	69
+petclinic-vet-query	INCLUDE	org.springframework.samples.petclinic.vet.VetController	true	true	1	0.875	src/main/java/org/springframework/samples/petclinic/vet/VetController.java	39
+petclinic-vet-query	INCLUDE	api:GET:/vets.html	true	true	2	0.806	src/main/java/org/springframework/samples/petclinic/vet/VetController.java	48
+petclinic-vet-query	INCLUDE	org.springframework.samples.petclinic.vet.Vet	true	true	1	0.839	src/main/java/org/springframework/samples/petclinic/vet/VetRepository.java	38
+petclinic-vet-query	INCLUDE	table:vets	true	true	2	0.719	src/main/java/org/springframework/samples/petclinic/vet/Vet.java	44
+petclinic-vet-query	INCLUDE	org.springframework.samples.petclinic.vet.VetControllerTests	true	true	1	0.805	src/test/java/org/springframework/samples/petclinic/vet/VetControllerTests.java	54
+petclinic-vet-query	INCLUDE	org.springframework.samples.petclinic.service.ClinicServiceTests	true	true	1	0.805	src/test/java/org/springframework/samples/petclinic/service/ClinicServiceTests.java	85
+petclinic-vet-query	INCLUDE	org.springframework.samples.petclinic.PetClinicIntegrationTests	true	true	1	0.805	src/test/java/org/springframework/samples/petclinic/PetClinicIntegrationTests.java	41
+petclinic-vet-query	EXCLUDE	org.springframework.samples.petclinic.owner.OwnerRepository	false	true			src/test/java/org/springframework/samples/petclinic/service/ClinicServiceTests.java	79
+petclinic-vet-query	EXCLUDE	org.springframework.samples.petclinic.owner.Owner	false	true			src/test/java/org/springframework/samples/petclinic/service/ClinicServiceTests.java	208

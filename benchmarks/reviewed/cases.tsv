@@ -1,0 +1,4 @@
+# case	project	commit	changed	scope	change-contract
+rest-greeting	gs-rest-service	3f4cef01152596c19bc4d37939409358812b1421	com.example.restservice.GreetingController#GreetingController.greeting(String)	LOCAL	Greeting format change: handler response and HTTP tests
+jpa-last-name	gs-accessing-data-jpa	ef48947528dba9021776282e12299e5298e66bca	com.example.accessingdatajpa.CustomerRepository#CustomerRepository.findByLastName(String)	LOCAL	Repository query change: real consumer and repository test; no test-only return path
+petclinic-vet-query	spring-petclinic	500158f732419217507c7656904b8e6aa1bcc0d6	org.springframework.samples.petclinic.vet.VetRepository#VetRepository.findAll(Pageable)	LOCAL	Paged vet query: vet consumers and tests; no owner feature via shared test suite

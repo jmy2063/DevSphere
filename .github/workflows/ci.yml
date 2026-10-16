@@ -41,7 +41,7 @@ jobs:
       - name: Synthetic impact benchmark and evaluation regression
         run: bash ./verify-benchmark.sh
 
-      - name: Pinned public Spring source checks
+      - name: Pinned public Spring source and reviewed impact checks
         run: bash ./verify-public-benchmark.sh
 
       - name: Semantic source checks
@@ -55,11 +55,101 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: PR URL validation
-        run: node tools/frontend-unit.cjs
+      - name: PR URL and HTML report validation
+        run: |
+          node tools/frontend-unit.cjs
+          node tools/report-unit.cjs
+          node tools/snapshot-unit.cjs
+          node tools/snapshot-report-unit.cjs
+
+      - name: Install browser for UI regression
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser UI regression with deterministic API fixtures
+        timeout-minutes: 3
+        env:
+          BROWSER_CHANNEL: chromium
+        run: node tools/run-ui-smoke.cjs
+
+      - name: Standalone HTML report browser checks
+        timeout-minutes: 2
+        env:
+          BROWSER_CHANNEL: chromium
+        run: node tools/report-browser-smoke.cjs
+
+      - name: Saved JSON review and comparison browser checks
+        timeout-minutes: 3
+        env:
+          BROWSER_CHANNEL: chromium
+        run: node tools/run-ui-smoke.cjs snapshot-browser-smoke.cjs
+
+      - name: Upload browser evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-smoke-evidence
+          path: |
+            benchmark-output/*.png
+            benchmark-output/*-report.html
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload analysis evaluation evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysis-evaluation-evidence
+          path: |
+            benchmark-output/reviewed-*.tsv
+            benchmark-output/public-source-results.tsv
+            benchmark-output/impact-results.tsv
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Standalone smoke report
         run: bash ./report-demo.sh
 
       - name: Verify report artifact
         run: test -s demo-output/DevSphere_AX_Report.html
+
+  windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.2'
+          cache: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Installer snapshot regressions
+        run: python windows-installer-src/test_build.py -v
+      - name: Generate standalone demo with current engine
+        shell: pwsh
+        run: |
+          $reportClasses = Join-Path $PWD '.benchmark-cache/installer-report'
+          New-Item -ItemType Directory -Path $reportClasses -Force | Out-Null
+          New-Item -ItemType Directory -Path 'demo-output' -Force | Out-Null
+          $sources = @(Get-ChildItem backend/src/main/java/com/devsphere/ax/model -Filter *.java | ForEach-Object FullName)
+          $sources += @('backend/src/main/java/com/devsphere/ax/analyzer/JavaStaticAnalyzer.java', 'backend/src/main/java/com/devsphere/ax/graph/SoftwareGraph.java', 'backend/src/main/java/com/devsphere/ax/graph/GraphBuilder.java', 'backend/src/main/java/com/devsphere/ax/risk/RiskScoreCalculator.java', 'backend/src/main/java/com/devsphere/ax/impact/ImpactAnalyzer.java', 'tools/StandaloneReport.java')
+          javac --release 17 -encoding UTF-8 -d $reportClasses $sources
+          if ($LASTEXITCODE -ne 0) { throw 'Standalone report compilation failed' }
+          java '-Dfile.encoding=UTF-8' -cp $reportClasses StandaloneReport sample-project demo-output/DevSphere_AX_Report.html
+          if ($LASTEXITCODE -ne 0) { throw 'Standalone report generation failed' }
+      - name: Build installer and verify isolated reinstall
+        shell: pwsh
+        run: python windows-installer-src/build.py --go (Get-Command go).Source --source head --report demo-output/DevSphere_AX_Report.html
+      - name: Upload verified Windows candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-windows-installer
+          path: release-output/*
+          if-no-files-found: error
+          retention-days: 7

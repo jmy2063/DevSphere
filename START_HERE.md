@@ -1,5 +1,7 @@
 # DevSphere AX 5.0 — START HERE
 
+혼자 제출·발표 준비를 진행할 때는 [MVP 완료 체크리스트](docs/MVP_FINISH_CHECKLIST.md)의 순서와 완료 기준을 먼저 확인하세요.
+
 ## 0. 설치형 배포본
 
 배포 ZIP에 포함된 `DevSphere_AX_Setup.exe`를 실행하면 `%LOCALAPPDATA%\DevSphereAX\5.0.0`에 설치됩니다. 설치 후 Desktop/Start Menu의 `DevSphere AX` 바로가기를 사용합니다.

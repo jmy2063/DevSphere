@@ -145,6 +145,20 @@ public class ImpactAnalyzer {
         List<Adjacent> result = new ArrayList<>();
         GraphNode current = graph.node(id).orElse(null);
 
+        // Tests are review evidence, not a bridge between independent production dependencies.
+        if (current != null && current.type() == NodeType.TEST) return result;
+        boolean testMethod = current != null && current.type() == NodeType.METHOD
+                && graph.incoming(id).stream().filter(e -> "DECLARES".equals(e.type()))
+                .anyMatch(e -> graph.node(e.source()).map(n -> n.type() == NodeType.TEST).orElse(false));
+        if (testMethod) {
+            // Keep the containing test class as a candidate without following other calls in the test.
+            for (GraphEdge edge : graph.incoming(id)) {
+                if ("DECLARES".equals(edge.type()))
+                    result.add(new Adjacent(edge.source(), edge, "OWNER", "← OWNER", "OWNER", 0));
+            }
+            return result;
+        }
+
         for (GraphEdge edge : graph.outgoing(id)) {
             if (IMPACT_RELATIONS.contains(edge.type())) {
                 result.add(new Adjacent(edge.target(), edge, edge.type(), edge.type() + " →", "DOWNSTREAM", 1));

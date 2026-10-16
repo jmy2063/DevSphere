@@ -14,11 +14,13 @@ export default function GithubReportPanel({report,children}:{report:GithubChange
     {report.warnings.map((w,i)=><p className="report-warning" key={i}>{w}</p>)}
     {verification&&verification.status!=='NOT_REQUESTED'&&<section className={`source-verification ${verification.status==='VERIFIED'?'verified':''}`} aria-label="Java 소스 검증 결과">
       <h3>Java 소스 내용 검증</h3><p>{verification.message}</p>
+      {verification.status==='VERIFIED'&&!report.declaredRevision&&<p className="review-note">커밋 SHA 입력 없이 Java 내용을 비교했습니다. 양쪽 Java가 같으면 HEAD를 우선합니다.</p>}
       {verification.revision&&<code>비교 커밋 {verification.revision}</code>}
       {verification.zipPrefix&&<p>ZIP 최상위 폴더: {verification.zipPrefix}</p>}
       <div className="report-counts"><span>ZIP Java <b>{verification.localFiles}</b></span><span>저장소 Java <b>{verification.repositoryFiles}</b></span><span>일치 <b>{verification.matchedFiles}</b></span><span>내용 변경 <b>{verification.changedFiles}</b></span><span>ZIP 누락 <b>{verification.missingFiles}</b></span><span>ZIP 추가 <b>{verification.extraFiles}</b></span></div>
       {!!verification.differences.length&&<details className="review-details" open><summary>Java 불일치 파일 · {verification.changedFiles+verification.missingFiles+verification.extraFiles}개</summary>{verification.differences.map(d=><div className="review-node" key={d.path}><b>{d.path}</b><span>{({CONTENT_CHANGED:'내용 변경',MISSING_IN_ZIP:'ZIP에 없음',EXTRA_IN_ZIP:'ZIP에만 있음'} as Record<string,string>)[d.status]||d.status}</span></div>)}<small>불일치 경로는 최대 100개 표시합니다.</small></details>}
       <p className="review-note">분석 대상 Java의 경로와 원본 바이트를 비교합니다. build/target 등 생성 폴더는 제외하며 설정·리소스는 검증하지 않습니다. 줄바꿈 차이도 불일치로 판정합니다.</p>
+      {verification.status!=='VERIFIED'&&<div className="source-recovery"><p>선택한 버전의 원본 ZIP을 다시 업로드해 검증할 수 있습니다.</p>{[['HEAD',report.headSha],['BASE',report.baseSha]].filter(([,sha])=>/^[a-fA-F0-9]{40}$/.test(sha)).map(([label,sha])=><a key={label} href={`https://github.com/${encodeURIComponent(report.owner)}/${encodeURIComponent(report.repo)}/archive/${sha}.zip`} target="_blank" rel="noopener noreferrer">{label} 원본 ZIP 다운로드</a>)}</div>}
     </section>}
     <div className="report-counts"><span>변경 파일 <b>{s.changedFiles}</b></span><span>메소드 매핑 <b>{s.methodMappedFiles}/{s.javaFiles}</b></span><span>파일 후보 <b>{s.fallbackFiles}</b></span><span>Java 매핑 실패 <b>{s.unmappedJavaFiles}</b></span><span>중복 제거 영향 <b>{s.uniqueImpactNodes}</b></span><span>시작점별 최고 CRI <b>{s.maxStartRiskScore}</b></span></div>
     <p className="review-note">영향은 Node ID로 중복 제거하고 변경 시작점은 제외했습니다. 최고 CRI는 개별 시작점 중 최댓값이며 PR 전체 위험 점수가 아닙니다.</p>

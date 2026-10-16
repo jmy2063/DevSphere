@@ -26,7 +26,8 @@ public class GithubChangeAnalysisService {
         if(!revision.isEmpty()&&!revision.matches("[a-f0-9]{40}"))throw new IllegalArgumentException("ZIP 커밋은 전체 40자리 SHA를 입력해주세요.");
         String status=revision.isEmpty()?"UNVERIFIED":revision.equalsIgnoreCase(headSha)?"DECLARED_HEAD_MATCH":
                 revision.equalsIgnoreCase(baseSha)?"DECLARED_BASE_MATCH":"DECLARED_MISMATCH";
-        boolean base=status.equals("DECLARED_BASE_MATCH");
+        boolean base=status.equals("DECLARED_BASE_MATCH")||revision.isEmpty()&&verification.status().equals("VERIFIED")
+                &&verification.revision().equalsIgnoreCase(baseSha)&&!verification.revision().equalsIgnoreCase(headSha);
         boolean mismatch=status.equals("DECLARED_MISMATCH");
         boolean requested=!verification.status().equals("NOT_REQUESTED");
         boolean verified=verification.status().equals("VERIFIED")&&!mismatch&&verification.revision().equalsIgnoreCase(base?baseSha:headSha);

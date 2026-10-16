@@ -1,0 +1,50 @@
+const assert=require('node:assert/strict');
+const {parseSavedReport,savedAnalyses,compareSavedReports,savedFixture,MAX_SNAPSHOT_BYTES}=require('./snapshot-test-support.cjs');
+const {buildHtmlReport}=require('./report-test-support.cjs');
+const parse=data=>parseSavedReport(JSON.stringify(data),'2026-10-16T00:00:00.000Z');
+function main(){
+  for(const mode of ['impact','comparison','github','evaluation']){
+    const source=savedFixture(mode);delete source.formatVersion;
+    const imported=parse({...source,token:'secret',headers:{Authorization:'secret'}});
+    assert.equal(imported.formatVersion,1);assert.equal(imported.importedAt,'2026-10-16T00:00:00.000Z');
+    assert.equal(JSON.stringify(imported).includes('secret'),false);assert.ok(buildHtmlReport(imported).includes('불러온 JSON 파일에 기록된 결과'));
+  }
+  const before=parse(savedFixture()),after=structuredClone(before);
+  after.project.projectId='second-upload';after.result.riskScore=50;
+  const old=after.project.nodes.find(n=>n.id==='method:other');old.id='method:other@99';old.line=99;
+  const impact=after.result.directImpact.find(n=>n.id==='method:other');impact.id=old.id;impact.line=99;impact.endLine=100;
+  after.result.directImpact=after.result.directImpact.filter(n=>n.type!=='TEST');after.result.paths=[];
+  const added={...after.result.directImpact[0],id:'new-test',type:'TEST',name:'NewTest',line:3,endLine:4};
+  after.project.nodes.push({id:added.id,name:added.name,type:added.type,sourcePath:'test/NewTest.java',line:3,confidence:1,attributes:{fqcn:'example.NewTest'}});after.project.nodeCount++;
+  after.result.directImpact.push(added);
+  const key=savedAnalyses(before)[0].key,delta=compareSavedReports(before,after,key);
+  assert.equal(delta.error,'');assert.equal(delta.added.length,1);assert.equal(delta.removed.length,1);assert.equal(delta.changed.length,1);
+  assert.equal(delta.changed[0].after.id,'method:other@99','Method identity must survive line-based ID changes');
+  assert.equal(delta.testsAdded.length,1);assert.equal(delta.testsRemoved.length,1);assert.equal(delta.riskBefore,42);assert.equal(delta.riskAfter,50);
+  const noKey=structuredClone(after);noKey.comparisonKey='';assert.ok(compareSavedReports(before,noKey,key).error.includes('비교 키'));
+  const noKeysA={...before,comparisonKey:''},noKeysB={...after,comparisonKey:''};assert.ok(compareSavedReports(noKeysA,noKeysB,key).error.includes('업로드 식별자'));
+  assert.equal(compareSavedReports(noKeysA,{...noKeysA},key).error,'');
+  const depth=structuredClone(before);depth.result.maxDepth=2;assert.ok(compareSavedReports(before,depth,key).error.includes('깊이'));
+  const scope=structuredClone(before);scope.result.scope='SYSTEM';assert.ok(compareSavedReports(before,scope,key).error);
+  const g1=parse(savedFixture('github')),g2=structuredClone(g1);g2.project.projectId='another';g2.github.headSha='c'.repeat(40);g2.github.sourceVerification.revision=g2.github.headSha;
+  const gKey=savedAnalyses(g1)[0].key;assert.equal(compareSavedReports(g1,g2,gKey).error,'');
+  g2.github.mappingSide='BASE';assert.ok(compareSavedReports(g1,g2,gKey).error.includes('매핑'));
+  const wrongRepo=structuredClone(g1);wrongRepo.github.repo='other';assert.ok(compareSavedReports(g1,wrongRepo,gKey).error);
+  const commitA=structuredClone(g1);commitA.github.kind='COMMIT';commitA.github.reference=commitA.github.headSha.slice(0,7);
+  const commitB=structuredClone(commitA);commitB.github.reference=commitB.github.headSha;
+  const commitKey=savedAnalyses(commitA)[0].key;assert.equal(compareSavedReports(commitA,commitB,commitKey).error,'');
+  commitB.github.headSha='d'.repeat(40);assert.ok(compareSavedReports(commitA,commitB,commitKey).error);
+  const mixedDepth=structuredClone(g1);mixedDepth.github.results.push({...mixedDepth.github.results[0],maxDepth:6});
+  assert.ok(compareSavedReports(g1,mixedDepth,gKey).error.includes('깊이'));
+  const blocked=structuredClone(g1);blocked.github.results=[];assert.equal(savedAnalyses(blocked).length,0);assert.ok(compareSavedReports(g1,blocked,gKey).error);
+  const ambiguous=structuredClone(before);const duplicate={...ambiguous.project.nodes.find(n=>n.id==='method:other'),id:'duplicate'};ambiguous.project.nodes.push(duplicate);ambiguous.result.directImpact.push({...ambiguous.result.directImpact.find(n=>n.id==='method:other'),id:'duplicate'});
+  assert.ok(compareSavedReports(ambiguous,before,key).error.includes('식별자'));
+  const invalid=[];
+  const add=mutate=>{const value=savedFixture();mutate(value);invalid.push(value);};
+  add(v=>v.formatVersion=2);add(v=>v.project.nodes.push(v.project.nodes[0]));add(v=>v.result.riskScore=101);add(v=>v.result.directImpact[0].confidence=2);add(v=>v.result.changedNode='missing');add(v=>v.result.scope=['FEATURE']);add(v=>v.result.paths[0].steps[0].id='test:check');add(v=>v.project.nodes[0].attributes=JSON.parse('{"__proto__":"bad"}'));add(v=>v.comparison=savedFixture('comparison').comparison);
+  for(const value of invalid)assert.throws(()=>parse(value));
+  assert.throws(()=>parseSavedReport('{'));assert.throws(()=>parseSavedReport(' '.repeat(MAX_SNAPSHOT_BYTES+1)));
+  assert.equal({}.bad,undefined);
+  console.log('PASS: legacy/versioned JSON, schema/reference/range/size checks, credential stripping, stable identities, context gates, PR/empty/mapping checks and ambiguity rejection');
+}
+if(require.main===module)main();

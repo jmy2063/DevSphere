@@ -21,6 +21,18 @@ PR 주소를 붙여 넣으면 base/head, 파일별 매핑 사유, 중복 제거 
 ZIP 커밋 SHA가 base/head와 다르면 분석을 중단하며, SHA는 사용자 선언으로 표시합니다.
 실제 Petclinic PR 검증과 사용법은 `docs/PR_WORKFLOW_REPORT_2026_10_07.md`를 참고합니다.
 
+2026-10-15 개선에서는 SHA 없이 Java 내용을 비교해 HEAD/BASE 분석 방향을 자동으로 선택합니다.
+내용 불일치에는 원본 ZIP 다운로드 경로를 제공하고, 고정 Chromium 브라우저 회귀 검사를 CI에 연결했습니다.
+최신 사용법과 로컬 검증 기록은 `docs/SOURCE_VERIFICATION_REPORT_2026_10_15.md`를 참고합니다.
+
+실제 Spring 소스의 변경 가정 3개·포함/제외 계약 21개를 추가하고,
+공유 테스트를 경유해 다른 업무로 퍼지는 영향 오탐을 수정했습니다.
+수정 전후 결과와 평가 범위는 `docs/IMPACT_REVIEW_REPORT_2026_10_15.md`를 참고합니다.
+
+분석 결과의 **HTML 보고서** 버튼으로 서버 없이 읽을 수 있는 검토 문서를 저장할 수 있습니다.
+개별 영향·범위 비교·PR/Commit·기대 대상 평가, 소스 검증 상태와 근거 경로를 포함합니다.
+사용법과 검증 결과는 `docs/HTML_REVIEW_REPORT_2026_10_15.md`에 있습니다.
+
 ## 4.0에서 강화된 품질 항목
 
 - Core regression **62 assertions PASS**
@@ -168,7 +180,11 @@ powershell -ExecutionPolicy Bypass -File .\verify-final-strict.ps1
 5. Impact Path에서 실제 파일/라인 확인
 6. CRI Breakdown + Evidence Confidence 설명
 7. GitHub PR/Commit 연결 시 changed line → changed Method 자동 분석
-8. Ground Truth 평가 또는 JSON Export
+8. Ground Truth 평가 또는 JSON/HTML 보고서 저장
+9. `저장된 JSON 검토·비교`에서 기준·비교 파일을 불러와 영향·테스트 후보 증감 확인
+10. `비교 HTML 보고서 저장`으로 선택한 범위의 증감과 이전·이후 근거 전체를 저장해 오프라인 검토·공유
+
+저장한 JSON은 서버 분석 세션을 복원하지 않고 읽기 전용으로 검토합니다. 다른 업로드의 일반 분석은 동일한 프로젝트 비교 키와 변경 시작점·범위·깊이가 필요합니다. 사용법과 검증 결과: [저장 결과 검토·비교](docs/SAVED_REVIEW_REPORT_2026_10_16.md).
 
 ## CRI의 정확한 의미
 

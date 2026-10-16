@@ -7,3 +7,7 @@ $publicBuild = Join-Path $PSScriptRoot '.benchmark-build'
 if ($LASTEXITCODE -ne 0) { throw 'Public benchmark compilation failed' }
 & java '-Dfile.encoding=UTF-8' -cp $publicBuild PublicSourceBenchmark $PSScriptRoot
 if ($LASTEXITCODE -ne 0) { throw 'Public source benchmark failed' }
+& javac --release 17 -encoding UTF-8 -cp $publicBuild -d $publicBuild (Join-Path $PSScriptRoot 'tools/ReviewedImpactBenchmark.java')
+if ($LASTEXITCODE -ne 0) { throw 'Reviewed impact benchmark compilation failed' }
+& java '-Dfile.encoding=UTF-8' -cp $publicBuild ReviewedImpactBenchmark $PSScriptRoot
+if ($LASTEXITCODE -ne 0) { throw 'Reviewed impact contract failed' }

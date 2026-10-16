@@ -12,7 +12,8 @@ class GithubReportControllerTest {
     final ObjectMapper json=new ObjectMapper();
     final GithubService github=mock(GithubService.class);
     final GithubChangeAnalysisService reports=mock(GithubChangeAnalysisService.class);
-    final AnalysisController controller=new AnalysisController(mock(AnalysisService.class),mock(AiExplanationService.class),github,mock(EvaluationService.class),reports,mock(GithubSourceVerificationService.class));
+    final GithubSourceVerificationService verification=mock(GithubSourceVerificationService.class);
+    final AnalysisController controller=new AnalysisController(mock(AnalysisService.class),mock(AiExplanationService.class),github,mock(EvaluationService.class),reports,verification);
     final AnalysisController.GithubReportRequest request=new AnalysisController.GithubReportRequest("o","r",42,"abcdef0","LOCAL",2,"",false);
     @Test void rejectsPrChangingWhileFilesAreRead()throws Exception{
         when(github.pullRequest("o","r",42,"token")).thenReturn(json.readTree("{\"base\":{\"sha\":\"a\"},\"head\":{\"sha\":\"b\"}}"),json.readTree("{\"base\":{\"sha\":\"a\"},\"head\":{\"sha\":\"c\"}}"));
@@ -34,5 +35,20 @@ class GithubReportControllerTest {
         when(github.commitFiles("o","r",sha,null)).thenReturn(files);
         controller.githubCommitReport("p",request,null);
         verify(reports).analyze("p","COMMIT","o","r","abcdef0","a",sha,"",files,AnalysisScope.LOCAL,2);
+    }
+    @Test void blankDeclarationUsesDetectionWhileExplicitRevisionDoesNot()throws Exception {
+        String base="a".repeat(40),head="b".repeat(40);
+        var meta=json.readTree("{\"base\":{\"sha\":\""+base+"\"},\"head\":{\"sha\":\""+head+"\"}}");
+        var files=json.createArrayNode();
+        when(github.pullRequest("o","r",42,null)).thenReturn(meta);
+        when(github.pullRequestFiles("o","r",42,null)).thenReturn(files);
+        var detected=new com.devsphere.ax.model.SourceVerification("VERIFIED",base,"",1,1,1,0,0,0,"match",java.util.List.of());
+        when(verification.detect("p","o","r",base,head,null)).thenReturn(detected);
+        when(verification.verify("p","o","r",base,null)).thenReturn(detected);
+        controller.githubPrReport("p",new AnalysisController.GithubReportRequest("o","r",42,"","LOCAL",2,"",true),null);
+        verify(verification).detect("p","o","r",base,head,null);
+        verify(reports).analyze("p","PR","o","r","42",base,head,"",files,AnalysisScope.LOCAL,2,detected);
+        controller.githubPrReport("p",new AnalysisController.GithubReportRequest("o","r",42,"","LOCAL",2,base,true),null);
+        verify(verification).verify("p","o","r",base,null);
     }
 }

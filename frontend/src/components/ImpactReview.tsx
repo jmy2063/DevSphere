@@ -22,7 +22,7 @@ export default function ImpactReview({result,onFocus}:{result:Impact;onFocus?:(p
     <div className="review-counts"><span>API <b>{result.apis.length}</b></span><span>Entity / Table <b>{result.entities.length}</b></span><span>테스트 후보 <b>{tests.length}</b></span></div>
     <p className="review-note">근거 신뢰도 {Math.round(result.evidenceConfidence*100)}%는 정적 관계의 가중치로 계산한 값입니다. 측정된 정확도나 장애 확률이 아닙니다.</p>
     <details className="review-details" open><summary>먼저 확인할 테스트 후보 · {tests.length}개</summary>
-      <p className="review-note">연결된 테스트 후보이며 실행 결과나 변경 코드의 커버리지를 보장하지 않습니다.</p>
+      <p className="review-note">테스트는 검토 후보로 남기고 다른 업무 코드로 영향을 전파하는 연결로 사용하지 않습니다. 실행 결과나 변경 코드의 커버리지를 보장하지 않습니다.</p>
       {tests.length?tests.map(n=><div className="review-node" key={n.id}><b>{n.name}</b><span>{location(n)}</span><small>{n.depth}단계 · {n.relation} · 신뢰도 {Math.round(n.confidence*100)}%</small></div>):<p className="review-note">연결된 테스트를 찾지 못했습니다. 변경 동작을 검증하는 테스트를 직접 확인하세요.</p>}
     </details>
     <h4>전체 영향 후보 · {nodes.length}개</h4>

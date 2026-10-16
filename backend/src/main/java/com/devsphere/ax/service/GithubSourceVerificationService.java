@@ -12,6 +12,19 @@ public class GithubSourceVerificationService {
     private final GithubService github;
     public GithubSourceVerificationService(AnalysisService analysis,GithubService github){this.analysis=analysis;this.github=github;}
 
+    /** HEAD takes priority when both revisions have identical Java sources. */
+    public SourceVerification detect(String project,String owner,String repo,String base,String head,String token) {
+        var headResult=verify(project,owner,repo,head,token);
+        if(!headResult.status().equals("MISMATCH")||base==null||!base.matches("[a-fA-F0-9]{40}")||base.equalsIgnoreCase(head))
+            return headResult;
+        var baseResult=verify(project,owner,repo,base,token);
+        if(baseResult.status().equals("VERIFIED"))
+            return baseResult.withMessage("HEAD와는 다르고 BASE의 분석 대상 Java 파일 전체와 일치합니다. BASE 줄 좌표로 분석합니다.");
+        if(baseResult.status().equals("UNAVAILABLE"))
+            return SourceVerification.unavailable(head,"HEAD Java 소스가 다르며 BASE 검증을 완료하지 못했습니다. "+baseResult.message());
+        return headResult.withMessage("HEAD·BASE 어느 쪽의 Java 소스와도 일치하지 않습니다. 아래는 HEAD 기준 차이입니다. 영향 분석을 중단했습니다.");
+    }
+
     public SourceVerification verify(String project,String owner,String repo,String revision,String token) {
         if(revision==null||!revision.matches("[a-fA-F0-9]{40}"))
             throw new IllegalArgumentException("내용 검증에는 전체 40자리 커밋 SHA가 필요합니다.");
