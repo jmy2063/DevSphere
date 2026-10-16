@@ -14,4 +14,4 @@ function fixture(){
   const comparison={LOCAL:{...result,scope:'LOCAL',directImpact:[test],riskScore:22},FEATURE:result,SYSTEM:{...result,scope:'SYSTEM',riskScore:55}};
   return {data:{generatedAt:'2026-10-15T13:00:00.000Z',project,result,comparison:null,github:null,evaluation:null},github,comparison,evaluation};
 }
-module.exports={buildHtmlReport:mod.exports.buildHtmlReport,reportDocument:mod.exports.reportDocument,fixture,base,head};
+module.exports={buildHtmlReport:mod.exports.buildHtmlReport,reportDocument:mod.exports.reportDocument,reviewBlock:mod.exports.reviewBlock,fixture,base,head};

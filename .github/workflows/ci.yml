@@ -61,6 +61,7 @@ jobs:
           node tools/report-unit.cjs
           node tools/snapshot-unit.cjs
           node tools/snapshot-report-unit.cjs
+          node tools/review-notes-unit.cjs
 
       - name: Install browser for UI regression
         working-directory: frontend
@@ -82,7 +83,9 @@ jobs:
         timeout-minutes: 3
         env:
           BROWSER_CHANNEL: chromium
-        run: node tools/run-ui-smoke.cjs snapshot-browser-smoke.cjs
+        run: |
+          node tools/run-ui-smoke.cjs snapshot-browser-smoke.cjs
+          node tools/run-ui-smoke.cjs review-notes-browser-smoke.cjs
 
       - name: Upload browser evidence
         if: ${{ always() }}

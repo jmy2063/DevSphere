@@ -1,6 +1,9 @@
 import type {Summary,Impact,ImpactComparison,GithubChangeReport,Evaluation,ImpactNode} from './api';
 
-export type ReportData={formatVersion?:1;generatedAt:string;project:Summary;result:Impact|null;comparison:ImpactComparison|null;github:GithubChangeReport|null;evaluation:Evaluation|null;comparisonKey?:string;importedAt?:string};
+export type ReviewDecision='CONFIRMED'|'EXCLUDED'|'NEEDS_REVIEW'|'MISSING';
+export type ReviewEntry={analysisKey:string;nodeId:string;decision:ReviewDecision;reason:string;updatedAt:string};
+export type ReviewLog={version:1;reviewer:string;entries:ReviewEntry[]};
+export type ReportData={formatVersion?:1;generatedAt:string;project:Summary;result:Impact|null;comparison:ImpactComparison|null;github:GithubChangeReport|null;evaluation:Evaluation|null;comparisonKey?:string;importedAt?:string;review?:ReviewLog};
 
 // All content is rendered as text. No scripts, remote assets, embedded JSON, or credentials.
 const escape=(value:unknown)=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
@@ -82,6 +85,17 @@ function evaluationBlock(evaluation:Evaluation):string {
     <h3>일치</h3>${list(evaluation.matched)}<h3>누락</h3>${list(evaluation.missed)}<h3>기대 목록 밖 후보</h3>${list(evaluation.unexpected)}</section>`;
 }
 
+export function reviewBlock(data:ReportData,analysisKey?:string,title='검토 기록'):string {
+  const review=data.review;if(!review)return '';
+  const entries=review.entries.filter(e=>!analysisKey||e.analysisKey===analysisKey);
+  const graph=new Map(data.project.nodes.map(n=>[n.id,n]));
+  const labels:Record<ReviewDecision,string>={CONFIRMED:'영향 확인',EXCLUDED:'제외',NEEDS_REVIEW:'확인 필요',MISSING:'누락 후보'};
+  function scopeOf(key:string):unknown{try{const parts=JSON.parse(key);return Array.isArray(parts)?parts[parts.length-1]:key;}catch{return key;}}
+  return `<section><h2>${escape(title)} · ${entries.length}개</h2><p>검토자 표기 ${escape(review.reviewer||'미입력')}</p>
+    ${notice('직접 입력한 검토 기록입니다. 독립적인 사람 검수·실행 테스트·정답을 인증하지 않으며 분석 후보·증감·CRI·평가 지표를 변경하지 않습니다.')}
+    ${table(['분석 범위','대상 / ID','판단','판단 이유 / 기록 시각'],entries.map(e=>{const n=graph.get(e.nodeId);return [escape(scopeOf(e.analysisKey)),`${escape(n?.name||e.nodeId)}<br>${code(e.nodeId)}${n?`<br>${escape(n.sourcePath)}:${escape(n.line)}`:''}`,escape(labels[e.decision]||e.decision),`<p class="explanation">${escape(e.reason||'판단 이유 없음')}</p>${escape(e.updatedAt)}`];}))}</section>`;
+}
+
 export function buildHtmlReport(data:ReportData):string {
   if(!data.result&&!data.comparison&&!data.github&&!data.evaluation)throw new Error('저장할 분석 결과가 없습니다.');
   const date=new Date(data.generatedAt);
@@ -94,7 +108,7 @@ export function buildHtmlReport(data:ReportData):string {
     ${data.comparisonKey?`<p>사용자 지정 프로젝트 비교 키: ${code(data.comparisonKey)}</p>`:''}
     <p>이 파일은 저장 시점의 분석 스냅샷입니다. 서버 없이 열 수 있으며 최신 결과로 자동 갱신하지 않습니다. 접힌 항목은 제목을 눌러 펼치고, 브라우저 찾기 기능으로 경로·이름을 검색할 수 있습니다.</p>
     <p>분석 클래스 ${escape(project.analyzedClasses)}개 · 노드 ${escape(project.nodeCount)}개 · 관계 ${escape(project.edgeCount)}개</p>${project.warnings.map(notice).join('')}
-    ${data.github?'':notice('이 결과에는 ZIP 커밋과의 소스 내용 일치 검증 기록이 없습니다.')}</section>${body}${data.evaluation?evaluationBlock(data.evaluation):''}
+    ${data.github?'':notice('이 결과에는 ZIP 커밋과의 소스 내용 일치 검증 기록이 없습니다.')}</section>${body}${data.evaluation?evaluationBlock(data.evaluation):''}${reviewBlock(data)}
     <footer>DevSphere AX · 정적 Java/Spring 분석 · 소스 검증이 있는 경우에도 Java 경로·원본 바이트만 검증하며 설정·리소스·의존성·실행 환경은 포함하지 않습니다. 검증된 GitHub 소스 위치만 외부 코드 링크로 제공합니다. 보고서가 서비스 전체 영향 정답이나 실제 장애 발생을 증명하지는 않습니다.</footer>`);
 }
 

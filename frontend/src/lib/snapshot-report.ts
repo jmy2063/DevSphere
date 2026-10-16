@@ -1,5 +1,5 @@
 import type {ImpactNode} from './api';
-import {reportDocument,type ReportData} from './report';
+import {reportDocument,reviewBlock,type ReportData} from './report';
 import {compareSavedReports,savedAnalyses} from './snapshots';
 
 const escape=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
@@ -45,6 +45,7 @@ export function buildSnapshotComparisonHtml(before:ReportData,after:ReportData,k
     ${notice('추가·제외와 근거·위치 변화는 저장된 분석 결과의 차이입니다. 실제 기능 변경·장애·테스트 성공 여부를 판정하지 않습니다. 의미 식별자를 비교하며 경로 전체의 차이는 별도 판정하지 않습니다.')}
     <p>후보 목록은 화면의 처음 50개 제한 없이 모두 포함합니다. 유지된 후보의 개별 목록과 원본 그래프·경로는 포함하지 않습니다. 재검토·재비교하려면 양쪽 원본 JSON도 함께 보관하세요. 이 HTML은 JSON 불러오기 대상이 아닙니다.</p></section>
     ${source('기준',beforeName,before)}${source('비교',afterName,after)}
+    ${reviewBlock(before,key,'기준 검토 기록')}${reviewBlock(after,key,'비교 검토 기록')}
     <section><h2>비교한 변경 시작점</h2>${table(['기준','비교'],[[analysis.results.map(r=>`${escape(r.changedNodeName)}<br>${code(r.changedNode)}`).join('<hr>'),savedAnalyses(after).find(a=>a.key===key)!.results.map(r=>`${escape(r.changedNodeName)}<br>${code(r.changedNode)}`).join('<hr>')]])}</section>
     ${nodes('추가된 영향 후보',delta.added)}${nodes('제외된 영향 후보',delta.removed)}
     <section><h2>근거·위치가 달라진 후보 · ${delta.changed.length}개</h2>${table(['이전 대상 / ID','이후 대상 / ID','이전 위치 / 근거','이후 위치 / 근거'],delta.changed.map(pair=>[`${escape(pair.before.name)}<br>${code(pair.before.id)}`,`${escape(pair.after.name)}<br>${code(pair.after.id)}`,`${location(pair.before)}<br>${evidence(pair.before)}`,`${location(pair.after)}<br>${evidence(pair.after)}`]))}</section>

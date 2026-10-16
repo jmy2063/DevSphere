@@ -3,6 +3,8 @@ import {buildHtmlReport,type ReportData} from '../lib/report';
 import {buildSnapshotComparisonHtml} from '../lib/snapshot-report';
 import {MAX_SNAPSHOT_BYTES,parseSavedReport,savedAnalyses,compareSavedReports} from '../lib/snapshots';
 import type {ImpactNode} from '../lib/api';
+import type {ReviewLog} from '../lib/report';
+import ReviewEditor from './ReviewEditor';
 
 type Side='before'|'after';
 type Saved={name:string;data:ReportData};
@@ -21,6 +23,7 @@ export default function SavedReviews({getCurrent,available,comparisonKey,onKeyCh
   const [saved,setSaved]=useState<Record<Side,Saved|null>>({before:null,after:null});
   const [loading,setLoading]=useState(false),[error,setError]=useState('');
   const [choice,setChoice]=useState(''),[viewer,setViewer]=useState<Side|null>(null);
+  const [editor,setEditor]=useState<Side|null>(null);
   const before=saved.before?.data,after=saved.after?.data;
   const choices=useMemo(()=>before&&after?savedAnalyses(before).filter(a=>savedAnalyses(after).some(b=>b.key===a.key)):[],[before,after]);
   const selected=choices.find(c=>c.key===choice)||choices.find(c=>c.scope==='FEATURE')||choices[0];
@@ -43,6 +46,13 @@ export default function SavedReviews({getCurrent,available,comparisonKey,onKeyCh
     }catch(e){setError(e instanceof Error?e.message:'결과를 보관할 수 없습니다.');}
   }
   function editKey(side:Side,value:string){setSaved(old=>{const target=old[side];return target?{...old,[side]:{...target,data:{...target.data,comparisonKey:value}}}:old;});}
+  function editReview(side:Side,review:ReviewLog):boolean{
+    const record=saved[side];if(!record||loading)return false;
+    setError('');try{
+      const data=parseSavedReport(JSON.stringify({...record.data,review}),record.data.importedAt);
+      setSaved(old=>({...old,[side]:{...record,data}}));return true;
+    }catch(e){setError(e instanceof Error?e.message:'검토 기록을 저장할 수 없습니다.');return false;}
+  }
   function saveComparison(){
     if(!saved.before||!saved.after||!selected)return;
     setError('');
@@ -65,12 +75,13 @@ export default function SavedReviews({getCurrent,available,comparisonKey,onKeyCh
       return <article className="saved-slot" key={side} aria-label={`${labels[side]} 스냅샷`}><h3>{labels[side]} 결과</h3>
         <label className="review-button saved-file">{labels[side]} JSON 불러오기<input type="file" accept=".json,application/json" aria-label={`${labels[side]} JSON 불러오기`} disabled={loading} onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)void importFile(side,file);}}/></label>
         <button className="review-button" disabled={!available||loading} onClick={()=>capture(side)}>현재 결과를 {side==='before'?'기준으로':'비교로'} 보관</button>
-        {record&&<><p><b>{record.name}</b><br/>{record.data.project.projectId}<br/>생성 {record.data.generatedAt}</p>
+        {record&&<><p><b>{record.name}</b><br/>{record.data.project.projectId}<br/>생성 {record.data.generatedAt}<br/>검토 기록 {record.data.review?.entries.length||0}개</p>
           <label className="field-label" htmlFor={`saved-key-${side}`}>{labels[side]} 프로젝트 비교 키</label><input id={`saved-key-${side}`} value={record.data.comparisonKey||''} maxLength={200} disabled={loading} onChange={e=>editKey(side,e.target.value)}/>
-          <div className="saved-actions"><button className="review-button" onClick={()=>setViewer(side)}>검토 내용 열기</button><button className="review-button" onClick={()=>download(record.data,'html')}>HTML 저장</button><button className="review-button" onClick={()=>download(record.data,'json')}>JSON 다시 저장</button><button className="review-button" disabled={loading} onClick={()=>{setSaved(old=>({...old,[side]:null}));if(viewer===side)setViewer(null);}}>제거</button></div>
+          <div className="saved-actions"><button className="review-button" disabled={loading} onClick={()=>setEditor(side)}>검토 기록 편집</button><button className="review-button" onClick={()=>setViewer(side)}>검토 내용 열기</button><button className="review-button" onClick={()=>download(record.data,'html')}>HTML 저장</button><button className="review-button" onClick={()=>download(record.data,'json')}>JSON 다시 저장</button><button className="review-button" disabled={loading} onClick={()=>{setSaved(old=>({...old,[side]:null}));if(viewer===side)setViewer(null);if(editor===side)setEditor(null);}}>제거</button></div>
         </>}
       </article>;
     })}</div>
+    {editor&&saved[editor]&&<div><h3>{labels[editor]} 결과 검토</h3><button className="review-button" onClick={()=>setEditor(null)}>검토 편집 닫기</button><ReviewEditor key={`${editor}-${saved[editor]!.data.importedAt}`} report={saved[editor]!.data} disabled={loading} onChange={log=>editReview(editor,log)}/><div className="saved-actions"><button className="review-button" disabled={loading} onClick={()=>download(saved[editor]!.data,'json')}>검토 기록 포함 JSON 저장</button><button className="review-button" disabled={loading} onClick={()=>download(saved[editor]!.data,'html')}>검토 기록 포함 HTML 저장</button></div></div>}
     {delta&&<section className="saved-delta" aria-label="저장 결과 증감 비교"><h3>저장 결과 증감 비교</h3>
       {choices.length>0&&<label>비교할 분석<select aria-label="비교할 분석" value={selected?.key||''} onChange={e=>setChoice(e.target.value)}>{choices.map(c=><option value={c.key} key={c.key}>{c.label}</option>)}</select></label>}
       {delta.error?<p className="saved-error" role="status">{delta.error}</p>:<>
