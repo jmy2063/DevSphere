@@ -5,7 +5,7 @@ async function json(url,init){const r=await fetch(url,{...init,signal:AbortSigna
 async function main(){
   const reports=[];
   for(const [name,revision,status] of [
-    ['base','818c4136ea971c21674525f9053de0d9c7ad8cfe','VERIFIED_JAVA_BASE'],
+    ['base','','VERIFIED_JAVA_BASE'],
     ['wrapped','','VERIFIED_JAVA_HEAD']
   ]) {
     let project;

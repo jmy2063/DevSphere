@@ -77,4 +77,33 @@ class SourceVerificationTest {
         var result=new GithubSourceVerificationService(analysis,github).verify("p","o","r",sha,"token");
         assertEquals("VERIFIED",result.status());verify(github).tree("o","r",other,"token");
     }
+    com.devsphere.ax.model.SourceVerification result(String status,String revision) {
+        return new com.devsphere.ax.model.SourceVerification(status,revision,"",1,1,status.equals("VERIFIED")?1:0,status.equals("MISMATCH")?1:0,0,0,status,List.of());
+    }
+    @Test void detectsBaseOnlyAfterConfirmedHeadMismatch() {
+        var service=spy(new GithubSourceVerificationService(mock(AnalysisService.class),mock(GithubService.class)));
+        doReturn(result("MISMATCH",other)).when(service).verify("p","o","r",other,"token");
+        doReturn(result("VERIFIED",sha)).when(service).verify("p","o","r",sha,"token");
+        var detected=service.detect("p","o","r",sha,other,"token");
+        assertEquals("VERIFIED",detected.status());assertEquals(sha,detected.revision());
+        verify(service).verify("p","o","r",sha,"token");
+    }
+    @Test void prefersVerifiedHeadAndDoesNotMaskUnavailableHead() {
+        for(String status:List.of("VERIFIED","UNAVAILABLE")) {
+            var service=spy(new GithubSourceVerificationService(mock(AnalysisService.class),mock(GithubService.class)));
+            doReturn(result(status,other)).when(service).verify("p","o","r",other,null);
+            assertEquals(status,service.detect("p","o","r",sha,other,null).status());
+            verify(service,never()).verify("p","o","r",sha,null);
+        }
+    }
+    @Test void distinguishesBothMismatchedFromIncompleteBaseAndMissingParent() {
+        for(String status:List.of("MISMATCH","UNAVAILABLE")) {
+            var service=spy(new GithubSourceVerificationService(mock(AnalysisService.class),mock(GithubService.class)));
+            doReturn(result("MISMATCH",other)).when(service).verify("p","o","r",other,null);
+            doReturn(result(status,sha)).when(service).verify("p","o","r",sha,null);
+            var detected=service.detect("p","o","r",sha,other,null);
+            assertEquals(status,detected.status());assertEquals(other,detected.revision());
+            assertEquals("MISMATCH",service.detect("p","o","r","",other,null).status());
+        }
+    }
 }

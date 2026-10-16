@@ -12,15 +12,16 @@ async function main(){
     page.on('pageerror',e=>errors.push(e.message));
     await page.goto(process.env.UI_URL||'http://127.0.0.1:5173');
     const uploaded=page.waitForResponse(r=>r.url().endsWith('/upload'));
-    await page.locator('input[type=file]').setInputFiles(path.join(root,'.benchmark-cache/petclinic-pr-2672.zip'));
+    await page.locator('input[type=file][accept=".zip"]').setInputFiles(path.join(root,'.benchmark-cache/petclinic-pr-2672.zip'));
     project=(await (await uploaded).json()).projectId;
     await page.locator('.github-box>summary').click();
     await page.getByLabel('GitHub PR 주소').fill('https://github.com/spring-projects/spring-petclinic/pull/2672/files');
-    await page.getByLabel('ZIP 커밋 SHA').fill(head);
+    // The normal PR flow leaves advanced version options closed and detects the source revision.
     const received=page.waitForResponse(r=>r.url().endsWith('/github-pr-report'),{timeout:90000});
     await page.getByRole('button',{name:'PR 변경 Method 분석',exact:true}).click();
     const response=await received;assert.equal(response.status(),200);const report=await response.json();
     assert.equal(report.revisionStatus,'VERIFIED_JAVA_HEAD');assert.equal(report.headSha,head);
+    assert.equal(report.declaredRevision,'');
     assert.equal(report.sourceVerification.status,'VERIFIED');assert.equal(report.sourceVerification.matchedFiles,report.sourceVerification.repositoryFiles);
     assert.ok(report.summary.changedStarts>0);assert.ok(report.summary.tests.length>0);
     assert.equal(report.files.length,report.summary.changedFiles);
@@ -35,14 +36,15 @@ async function main(){
     await page.screenshot({path:path.join(output,'github-pr-live-mobile.png'),fullPage:true});
     const previousProject=project;
     const changedUpload=page.waitForResponse(r=>r.url().endsWith('/upload'));
-    await page.locator('input[type=file]').setInputFiles(path.join(root,'.benchmark-cache/petclinic-pr-2672-changed.zip'));
+    await page.locator('input[type=file][accept=".zip"]').setInputFiles(path.join(root,'.benchmark-cache/petclinic-pr-2672-changed.zip'));
     project=(await (await changedUpload).json()).projectId;
     await fetch((process.env.LIVE_API_URL||'http://127.0.0.1:8080')+'/api/analysis/'+previousProject,{method:'DELETE'});
-    await page.getByLabel('ZIP 커밋 SHA').fill(head);
+    assert.equal(await page.getByLabel('ZIP 커밋 SHA').inputValue(),'');
     const rejected=page.waitForResponse(r=>r.url().endsWith('/github-pr-report'),{timeout:90000});
     await page.getByRole('button',{name:'PR 변경 Method 분석',exact:true}).click();
     const rejectedResponse=await rejected;assert.equal(rejectedResponse.status(),200);const mismatch=await rejectedResponse.json();
     assert.equal(mismatch.revisionStatus,'JAVA_CONTENT_MISMATCH');assert.equal(mismatch.results.length,0);
+    assert.ok(mismatch.sourceVerification.message.includes('HEAD·BASE'));
     assert.equal(mismatch.sourceVerification.changedFiles,1);assert.equal(mismatch.sourceVerification.missingFiles,1);assert.equal(mismatch.sourceVerification.extraFiles,1);
     await page.getByText('Java 소스 불일치 · 분석 중단',{exact:true}).waitFor();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);

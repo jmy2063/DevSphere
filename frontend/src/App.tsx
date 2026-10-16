@@ -8,7 +8,9 @@ import ImpactReview from './components/ImpactReview';
 import GithubReportPanel from './components/GithubReportPanel';
 import ResultSnapshot from './components/ResultSnapshot';
 import EvidencePathPanel from './components/EvidencePathPanel';
+import SavedReviews from './components/SavedReviews';
 import {parseGithubPrUrl} from './lib/github-url';
+import {buildHtmlReport,type ReportData} from './lib/report';
 import {
   evaluateGroundTruth,githubChangeReport,health,impact,impactComparison,uploadZip,
   type GithubChangeReport,type AnalysisScope,type Evaluation,type Health,type Impact,type ImpactComparison,type ImpactPath,type ImpactNode,type Summary
@@ -43,6 +45,7 @@ export default function App(){
   const [commitSha,setCommitSha]=useState('');
   const [token,setToken]=useState('');
   const [groundTruth,setGroundTruth]=useState('');
+  const [reviewProjectKey,setReviewProjectKey]=useState('');
   const [focusedPath,setFocusedPath]=useState<ImpactPath|null>(null);
   const [inspectedNodeId,setInspectedNodeId]=useState('');
   const snapshotRef=useRef<HTMLElement>(null);
@@ -84,7 +87,7 @@ export default function App(){
     if(busy)return;
     setBusy(true);setBusyLabel('프로젝트를 분석하고 있습니다…');setError('');clearOutputs();
     try{
-      const next=await uploadZip(file);setSummary(next);setQuery('');setGroundTruth('');setUploadedRevision('');
+      const next=await uploadZip(file);setSummary(next);setQuery('');setGroundTruth('');setUploadedRevision('');setReviewProjectKey('');
       const first=next.nodes.find(n=>n.type==='SERVICE')?.id||next.nodes.find(n=>n.type==='CONTROLLER')?.id||next.nodes[0]?.id||'';
       setSelected(first);setInspectedNodeId(first);
     }catch(e){setError(messageOf(e))}finally{setBusy(false);setBusyLabel('')}
@@ -133,13 +136,13 @@ export default function App(){
     document.querySelector('.graph-section')?.scrollIntoView({behavior:'smooth',block:'start'});
   }
   function drop(e:DragEvent){e.preventDefault();setDragging(false);const file=e.dataTransfer.files?.[0];if(file)void analyzeFile(file)}
-  function exportReport(){
-    if(!summary)return;
-    const payload={generatedAt:new Date().toISOString(),project:summary,result,comparison,github:prReport,evaluation};
-    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  function exportReport(format:'json'|'html'='json'){
+    const payload=currentReport();if(!payload)return;
+    const blob=new Blob([format==='html'?buildHtmlReport(payload):JSON.stringify(payload,null,2)],{type:format==='html'?'text/html;charset=utf-8':'application/json'});
     const url=URL.createObjectURL(blob);const a=document.createElement('a');
-    a.href=url;a.download=`DevSphere_AX_${summary.projectId}_report.json`;a.click();URL.revokeObjectURL(url);
+    a.href=url;a.download=`DevSphere_AX_${payload.project.projectId}_report.${format}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
+  function currentReport():ReportData|null{return summary&&(result||comparison||prReport||evaluation)?{formatVersion:1,generatedAt:new Date().toISOString(),project:summary,result,comparison,github:prReport,evaluation,comparisonKey:reviewProjectKey.trim()}:null;}
 
   return <main>
     <header>
@@ -155,6 +158,7 @@ export default function App(){
       <span className={result||comparison||prReport?'current':''}><b>3</b> 결과와 근거 확인</span>
     </div>
     {busyLabel&&<p className="flow-status" role="status">{busyLabel}</p>}
+    <SavedReviews getCurrent={currentReport} available={!busy&&Boolean(result||comparison||prReport||evaluation)} comparisonKey={reviewProjectKey} onKeyChange={setReviewProjectKey}/>
 
     <section className="top-grid">
       <div className={`panel uploader ${dragging?'dragging':''}`} onDragOver={e=>{e.preventDefault();setDragging(true)}} onDragLeave={()=>setDragging(false)} onDrop={drop}>
@@ -178,7 +182,7 @@ export default function App(){
       </div>
 
       <aside ref={analysisRef} tabIndex={-1} aria-label="변경점 분석 입력">
-        <div className="section-heading"><div><GitBranch/><span>2. 변경점 선택</span></div>{summary&&(result||comparison||prReport||evaluation)&&<button className="icon-action" onClick={exportReport} title="JSON 결과 저장" aria-label="JSON 결과 저장"><Download size={16}/></button>}</div>
+        <div className="section-heading"><div><GitBranch/><span>2. 변경점 선택</span></div>{summary&&(result||comparison||prReport||evaluation)&&<div className="report-actions"><button className="review-button" onClick={()=>exportReport('html')} disabled={busy} title="HTML 검토 보고서 저장">HTML 보고서</button><button className="icon-action" onClick={()=>exportReport()} disabled={busy} title="JSON 결과 저장" aria-label="JSON 결과 저장"><Download size={16}/></button></div>}</div>
         <p className="analysis-intro">메서드를 직접 선택하거나 아래에 GitHub PR 주소를 붙여 넣으세요.</p>
         <label className="field-label" htmlFor="node-query">분석 대상 검색</label><div className="search"><Search size={16}/><input id="node-query" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Method, Service, Controller…" disabled={!summary||busy}/></div>
         <label className="field-label" htmlFor="selected-node">변경 시작점</label><select id="selected-node" value={selected} onChange={e=>{clearOutputs();setSelected(e.target.value);setInspectedNodeId(e.target.value)}} disabled={!summary||busy}>{candidates.map(n=><option key={n.id} value={n.id}>{n.type} · {n.name}{n.id===selected&&!candidateSearch.nodes.some(item=>item.id===n.id)?' · 현재 선택':''}</option>)}</select>
@@ -202,7 +206,7 @@ export default function App(){
             <input id="zip-revision" className="github-url" placeholder="ZIP의 전체 커밋 SHA (선택, 40자리)" value={uploadedRevision} onChange={e=>setUploadedRevision(e.target.value.trim())} disabled={busy}/>
             <small>ZIP 커밋은 사용자 입력이며 파일 내용 일치를 증명하지 않습니다.</small>
             <label className="source-verify-choice"><input type="checkbox" checked={verifySources} onChange={e=>setVerifySources(e.target.checked)} disabled={busy}/>Java 소스 내용 검증</label>
-            <small>{verifySources?'저장소의 분석 대상 Java 전체와 비교합니다. 불일치·검증 불가는 분석을 중단합니다. SHA 미입력 시 HEAD와 비교합니다.':'내용 검증을 생략합니다. ZIP 버전은 사용자 선언 또는 HEAD 가정으로 표시합니다.'}</small>
+          <small>{verifySources?'저장소의 분석 대상 Java 전체와 비교합니다. SHA를 모르면 비워두세요. HEAD 우선으로 비교하고 다르면 BASE도 확인합니다. 불일치·검증 불가는 분석을 중단합니다.':'내용 검증을 생략합니다. ZIP 버전은 사용자 선언 또는 HEAD 가정으로 표시합니다.'}</small>
             <div className="github-grid"><input aria-label="GitHub owner" placeholder="owner" value={owner} onChange={e=>setOwner(e.target.value)}/><input aria-label="GitHub repository" placeholder="repository" value={repo} onChange={e=>setRepo(e.target.value)}/><input aria-label="PR 번호" placeholder="PR 번호" inputMode="numeric" value={pr} onChange={e=>setPr(e.target.value.replace(/\D/g,''))}/><input aria-label="GitHub Token" type="password" placeholder="Token (Private repo만)" value={token} onChange={e=>setToken(e.target.value)}/></div>
             <div className="github-actions"><input className="sha-input" aria-label="Commit SHA" placeholder="Commit SHA" value={commitSha} onChange={e=>setCommitSha(e.target.value.trim())}/><button className="pr-run" disabled={!summary||busy||!commitSha} onClick={()=>void runCommit()}>Commit 분석</button></div>
             <small>Token은 브라우저 메모리에만 유지되며 결과 JSON에는 저장하지 않습니다.</small>

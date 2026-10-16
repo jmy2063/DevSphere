@@ -73,17 +73,41 @@ The MVP keeps a bounded in-memory registry (maximum 20 analyzed projects). Neo4j
 `POST /api/analysis/{projectId}/github-commit-report`
 
 Both accept optional `X-GitHub-Token`. PR requests use `owner`, `repo`, `pullNumber`,
-`scope`, `maxDepth`, and optional `uploadedRevision` (full 40-character SHA).
+`scope`, `maxDepth`, optional `uploadedRevision` (full 40-character SHA), and optional `verifySources` (boolean, default false for API compatibility; true in the UI).
 Commit requests replace `pullNumber` with `sha` (7–64 hexadecimal characters).
 The legacy `*-impact` endpoints retain their list response; the UI now uses reports.
 
 Reports return `baseSha`, `headSha`, `declaredRevision`, `revisionStatus`, `mappingSide`,
-`warnings`, `files`, `results` and `summary`. Revision statuses:
+`warnings`, `files`, `results`, `summary` and `sourceVerification`. Revision statuses:
 
 - `UNVERIFIED`: no declaration; HEAD NEW lines assumed with a warning.
 - `DECLARED_HEAD_MATCH`: declared SHA matches HEAD; use NEW lines.
 - `DECLARED_BASE_MATCH`: declared SHA matches BASE; use OLD lines and previous rename paths.
 - `DECLARED_MISMATCH`: no impacts computed; file reasons explain the mismatch.
+- `VERIFIED_JAVA_HEAD` / `VERIFIED_JAVA_BASE`: the complete analyzed Java file set matches the selected revision; use NEW / OLD lines respectively.
+- `JAVA_CONTENT_MISMATCH`: Java file paths or bytes differ; no impacts computed.
+- `JAVA_VERIFICATION_UNAVAILABLE`: complete comparison could not be performed; no impacts computed when verification was requested.
+
+With `verifySources:true` and an empty declaration, compare HEAD first. Only a confirmed
+HEAD mismatch triggers a BASE comparison. A verified BASE chooses OLD coordinates without
+filling or inventing `declaredRevision`. An unavailable HEAD does not trigger a fallback.
+If both revisions differ, report HEAD differences and stop. If HEAD differs but BASE cannot
+be checked, report verification unavailable. If both revisions have identical Java, HEAD has priority;
+Java equality does not identify a unique historical commit. An explicit SHA restricts comparison
+to that revision and never switches to the other side.
+
+`sourceVerification` contains `status` (`NOT_REQUESTED`, `VERIFIED`, `MISMATCH`, `UNAVAILABLE`),
+`revision`, `zipPrefix`, file counts (`localFiles`, `repositoryFiles`, `matchedFiles`,
+`changedFiles`, `missingFiles`, `extraFiles`), `message`, and up to 100 `differences`.
+Differences use `CONTENT_CHANGED`, `MISSING_IN_ZIP`, `EXTRA_IN_ZIP`.
+The comparison uses Git blob hashes of original bytes, including line endings, and the shared
+analyzer Java file selection. Missing/extra Java files are included; graph-less files such as
+`package-info.java` are also included. A common ZIP wrapper may be removed; no repository subtree
+is selected implicitly. Partial source ZIPs are not full-repository verification.
+Truncated trees, ambiguous roots, eligible submodules, unsupported Java entries (including
+symlinks), or more than 5,000 repository Java files cannot receive a verified result.
+Configuration, resources, dependencies and runtime behavior are outside the comparison scope.
+Fingerprints share the graph's bounded registry entry and disappear on eviction/deletion.
 
 The declaration does not verify ZIP contents. Commit BASE is the first parent.
 PR base/head are checked again after file pagination; concurrent changes reject the request.

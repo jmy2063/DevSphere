@@ -43,3 +43,17 @@ Full Web Program은 JDK 17+, Node.js 20+, npm, Gradle 또는 IntelliJ Gradle 환
 빌드 후 `release-output/DevSphere_AX_Setup.exe --verify-payload`와
 `--self-test`를 실행하면 내장 파일의 해시, 격리 설치, 재설치, 설치된 런처 실행을 확인할 수 있습니다.
 실제 사용자 설치 경로와 바로가기는 이 검증에서 변경하지 않습니다.
+
+빌드 도구는 런처도 선택한 소스로 다시 만들고 위 두 검사를 자동 실행한 뒤 산출물을 기록합니다.
+작업 폴더에 변경이 있으면 `--source head`(마지막 커밋만) 또는
+`--source working-tree`(수정·새 파일·삭제 포함)를 명시해야 합니다.
+현재 작업 내용을 확인할 때는 기존 배포본과 구분해 다음처럼 빌드합니다.
+
+```powershell
+python windows-installer-src/build.py --go C:\path\to\go.exe --report demo-output\DevSphere_AX_Report.html --source working-tree --output release-output\working-tree-preview
+```
+
+`BUILD_INFO.txt`와 Payload 내부 `BUILD_SOURCE_INFO.json`에서 선택한 소스와 해시를 확인할 수 있습니다.
+작업 폴더 빌드는 검토용 후보이며, 최종 제출에는 커밋을 고정한 재빌드와 새 환경의 전체 실행 검증이 필요합니다.
+
+소스 선택 개선과 로컬 검증 기록: [2026-10-16 설치본 검증](INSTALLER_VALIDATION_2026_10_16.md).

@@ -1,0 +1,6 @@
+rest-greeting	gs-rest-service	3f4cef01152596c19bc4d37939409358812b1421
+jpa-last-name	gs-accessing-data-jpa	ef48947528dba9021776282e12299e5298e66bca
+petclinic-vet-query	spring-petclinic	500158f732419217507c7656904b8e6aa1bcc0d6
+sha256	backend/src/main/java/com/devsphere/ax/impact/ImpactAnalyzer.java	c95f8a1261b57ddfa35c159ca584cd4c8c2d08e12084f63098de9b0fad9ec0f0
+sha256	benchmarks/reviewed/cases.tsv	d26d866948210ec5ac0a003917a0c07b543f73241ad8db26cd7887d4cf043b29
+sha256	benchmarks/reviewed/labels.tsv	530d8aa9d672eb25c891d961368a45c7bd16ee0d60180c4c77a3b5207966fa69

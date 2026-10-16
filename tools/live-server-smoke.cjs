@@ -62,7 +62,7 @@ async function main(){
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.goto(UI);
     const uploaded=page.waitForResponse(r=>r.url().endsWith('/api/analysis/upload')&&r.request().method()==='POST');
-    await page.locator('input[type=file]').setInputFiles(path.join(ROOT,'.benchmark-cache/spring-petclinic.zip'));
+    await page.locator('input[type=file][accept=".zip"]').setInputFiles(path.join(ROOT,'.benchmark-cache/spring-petclinic.zip'));
     const summary=await (await uploaded).json();projects.push(summary.projectId);
     await page.locator('aside select').first().selectOption('class:org.springframework.samples.petclinic.vet.VetRepository#findAll');
     await page.getByRole('button',{name:'영향 분석',exact:true}).click();

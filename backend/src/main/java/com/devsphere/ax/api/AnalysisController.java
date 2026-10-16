@@ -151,10 +151,10 @@ public class AnalysisController {
                 request.uploadedRevision(),files,AnalysisScope.from(request.scope()),request.maxDepth());
         String declared=request.uploadedRevision()==null?"":request.uploadedRevision().trim();
         if(!declared.isEmpty()&&!declared.matches("[a-fA-F0-9]{40}"))throw new IllegalArgumentException("ZIP 커밋은 전체 40자리 SHA를 입력해주세요.");
-        String target=declared.isEmpty()?head:declared;
-        var verification=!declared.isEmpty()&&!declared.equalsIgnoreCase(base)&&!declared.equalsIgnoreCase(head)
+        var verification=declared.isEmpty()?sourceVerification.detect(project,request.owner(),request.repo(),base,head,token)
+                :!declared.equalsIgnoreCase(base)&&!declared.equalsIgnoreCase(head)
                 ?SourceVerification.unavailable(declared,"선언한 커밋이 BASE/HEAD와 다릅니다.")
-                :sourceVerification.verify(project,request.owner(),request.repo(),target,token);
+                :sourceVerification.verify(project,request.owner(),request.repo(),declared,token);
         return githubAnalysis.analyze(project,kind,request.owner(),request.repo(),reference,base,head,request.uploadedRevision(),files,
                 AnalysisScope.from(request.scope()),request.maxDepth(),verification);
     }

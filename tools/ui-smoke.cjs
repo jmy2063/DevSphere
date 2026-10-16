@@ -4,12 +4,23 @@ const {chromium} = require('playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const {pathToFileURL}=require('node:url');
 
 async function main(){
   const browser = await chromium.launch({channel:process.env.BROWSER_CHANNEL||'chrome',headless:true});
   try{
     const context=await browser.newContext({viewport:{width:1440,height:1000},permissions:['clipboard-read','clipboard-write']});
     const page=await context.newPage();
+    const output=path.resolve(__dirname,'../benchmark-output');fs.mkdirSync(output,{recursive:true});
+    async function saveHtml(name,expected){
+      const pending=page.waitForEvent('download');
+      await page.getByRole('button',{name:'HTML 보고서',exact:true}).click();
+      const download=await pending;assert.ok(download.suggestedFilename().endsWith('.html'));
+      const target=path.join(output,'exported-'+name+'-report.html');await download.saveAs(target);
+      const html=fs.readFileSync(target,'utf8');assert.equal(html.includes('fixture-secret'),false);assert.ok(html.includes(expected));
+      const offline=await browser.newContext({offline:true});
+      try{const viewer=await offline.newPage();await viewer.goto(pathToFileURL(target).href);await viewer.getByRole('heading',{name:'DevSphere AX 검토 보고서',exact:true}).waitFor();assert.equal(await viewer.locator('script').count(),0);}finally{await offline.close();}
+    }
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     const root={id:'root',name:'CheckoutService',type:'SERVICE',sourcePath:'src/CheckoutService.java',line:1,confidence:1,attributes:{}};
     const methods=Array.from({length:15},(_,i)=>({id:`m${i}`,name:`Worker.process${i}()`,type:'METHOD',sourcePath:'src/Worker.java',line:i+2,confidence:.9,attributes:{}}));
@@ -49,9 +60,9 @@ async function main(){
       await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
     });
     await page.goto(process.env.UI_URL||'http://127.0.0.1:5173');
-    await page.locator('input[type=file]').focus();
+    await page.locator('input[type=file][accept=".zip"]').focus();
     assert.equal(await page.evaluate(()=>document.activeElement?.getAttribute('type')),'file','ZIP picker must be keyboard focusable');
-    await page.locator('input[type=file]').setInputFiles({name:'fixture.zip',mimeType:'application/zip',buffer:Buffer.from('fixture')});
+    await page.locator('input[type=file][accept=".zip"]').setInputFiles({name:'fixture.zip',mimeType:'application/zip',buffer:Buffer.from('fixture')});
     await page.getByText('준비 완료 · fixture').waitFor();
     await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='변경점 분석 입력');
     await page.getByRole('button',{name:'영향 분석',exact:true}).click();
@@ -70,6 +81,7 @@ async function main(){
     await page.getByRole('button',{name:'상세 결과 보기'}).click();
     await page.waitForFunction(()=>Math.abs(document.querySelector('#detailed-results').getBoundingClientRect().top)<150);
     await page.getByRole('heading',{name:'이 변경에서 확인할 항목'}).waitFor();
+    await saveHtml('impact','CheckoutService');
     await page.getByRole('button',{name:'나머지 8개 모두 보기',exact:true}).click();
     assert.equal(await page.locator('.review-details>summary').filter({hasText:'METHOD'}).count(),15);
     await page.getByLabel('영향 후보 검색').fill('process14');
@@ -92,13 +104,14 @@ async function main(){
     await page.getByRole('button',{name:'16단계 Worker.process14() 살펴보기'}).click();
     assert.equal(await page.locator('.result-snapshot').count(),1,'Inspecting an evidence step must preserve the analysis result');
     await page.getByRole('button',{name:'전체 그래프로 돌아가기'}).click();
-    const output=path.resolve(__dirname,'../benchmark-output');fs.mkdirSync(output,{recursive:true});
     await page.screenshot({path:path.join(output,'review-desktop.png'),fullPage:true});
     await page.setViewportSize({width:390,height:844});
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Mobile page must not overflow horizontally');
     assert.equal(await page.locator('.workspace aside').evaluate(el=>el.getBoundingClientRect().top<document.querySelector('.graph-section').getBoundingClientRect().top),true,'Analysis controls should precede the graph on mobile');
     await page.screenshot({path:path.join(output,'review-mobile.png'),fullPage:true});
     await page.getByRole('button',{name:'3단계 비교'}).click();
+    await page.locator('.compare-delta').first().waitFor();
+    await saveHtml('comparison','분석 범위 비교');
     await page.getByRole('region',{name:'FEATURE 범위 증가분'}).getByText('새 영향 후보 15개').waitFor();
     await page.getByRole('region',{name:'SYSTEM 범위 증가분'}).getByText('새 영향 후보 1개').waitFor();
     await page.getByRole('region',{name:'SYSTEM 범위 증가분'}).getByText('API 1').waitFor();
@@ -122,6 +135,7 @@ async function main(){
     await page.getByRole('button',{name:'PR 변경 Method 분석',exact:true}).click();
     await page.getByRole('region',{name:'핵심 분석 결과'}).getByRole('heading',{name:'PR #42'}).waitFor();
     await page.getByRole('heading',{name:/PR 분석 요약/}).waitFor();
+    await saveHtml('pr','Java 소스 검증 완료 · HEAD');
     await page.getByText('Java 소스 검증 완료 · HEAD',{exact:true}).waitFor();
     await page.getByLabel('변경 파일 검색').fill('Missing');
     assert.equal(await page.locator('.github-report .review-node').filter({hasText:'src/Missing.java'}).count(),1);
@@ -131,6 +145,7 @@ async function main(){
     await page.getByLabel('ZIP 커밋 SHA').fill('c'.repeat(40));
     await page.getByRole('button',{name:'PR 변경 Method 분석',exact:true}).click();
     await page.getByText('입력한 커밋: 버전 불일치',{exact:true}).waitFor();
+    await saveHtml('blocked-pr','산출 안 됨');
     assert.equal(await page.locator('.github-report').count(),1,'Zero mapped starts must still show the report');
     await page.getByRole('region',{name:'핵심 분석 결과'}).getByText('산출 안 됨').waitFor();
     await page.screenshot({path:path.join(output,'github-report-mobile.png'),fullPage:true});
@@ -139,6 +154,7 @@ async function main(){
     await page.getByRole('button',{name:'PR 변경 Method 분석',exact:true}).click();
     await page.getByText('Java 소스 불일치 · 분석 중단',{exact:true}).waitFor();
     await page.getByRole('region',{name:'Java 소스 검증 결과'}).getByText('src/CheckoutService.java',{exact:true}).waitFor();
+    assert.equal(await page.getByRole('link',{name:'HEAD 원본 ZIP 다운로드'}).getAttribute('href'),'https://github.com/spring-projects/spring-petclinic/archive/'+('b'.repeat(40))+'.zip');
     await page.getByLabel('Java 소스 내용 검증',{exact:true}).uncheck();
     await page.getByLabel('ZIP 커밋 SHA').fill('');
     await page.getByRole('button',{name:'PR 변경 Method 분석',exact:true}).click();
@@ -153,7 +169,7 @@ async function main(){
     assert.equal(await page.locator('.result-snapshot').count(),0,'Changing the analysis start must clear old results');
     assert.equal(await page.locator('#selected-node').inputValue(),'m0');
     largeFixture=true;
-    await page.locator('input[type=file]').setInputFiles({name:'large.zip',mimeType:'application/zip',buffer:Buffer.from('fixture-large')});
+    await page.locator('input[type=file][accept=".zip"]').setInputFiles({name:'large.zip',mimeType:'application/zip',buffer:Buffer.from('fixture-large')});
     await page.getByText('분석 가능한 노드 526개').waitFor();
     await page.getByLabel('분석 대상 검색').fill('Large.method509');
     await page.locator('#selected-node').selectOption('large509');

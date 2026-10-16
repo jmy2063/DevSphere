@@ -7,6 +7,9 @@ public record SourceVerification(String status,String revision,String zipPrefix,
         int matchedFiles,int changedFiles,int missingFiles,int extraFiles,String message,List<Difference> differences) {
     public SourceVerification { differences=List.copyOf(differences); }
     public record Difference(String path,String status) {}
+    public SourceVerification withMessage(String value) {
+        return new SourceVerification(status,revision,zipPrefix,localFiles,repositoryFiles,matchedFiles,changedFiles,missingFiles,extraFiles,value,differences);
+    }
     public static SourceVerification unavailable(String revision,String message) {
         return new SourceVerification("UNAVAILABLE",revision,"",0,0,0,0,0,0,message,List.of());
     }

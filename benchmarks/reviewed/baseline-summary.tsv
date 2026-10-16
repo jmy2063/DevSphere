@@ -1,0 +1,4 @@
+case	labelled_tp	labelled_fp	labelled_fn	labelled_tn	labelled_precision	labelled_recall	unlabelled_predictions	test_candidates	cri	invalid_paths
+rest-greeting	3	0	0	1	1.0	1.0	0	1	31	0
+jpa-last-name	5	1	0	1	0.8333333333333334	1.0	3	1	41	0
+petclinic-vet-query	8	2	0	0	0.8	1.0	15	6	73	0
