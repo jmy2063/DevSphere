@@ -26,7 +26,17 @@ async function main(){
         request.onsuccess=()=>{const db=request.result,tx=db.transaction('workspace','readonly'),get=tx.objectStore('workspace').get('current');tx.oncomplete=()=>{db.close();resolve(get.result??null);};tx.onabort=()=>reject(tx.error);};request.onerror=()=>reject(request.error);
       }));
     }
-    async function complete(target=page){await panel(target).getByText(/이 브라우저에 보관 완료/).waitFor();await target.waitForFunction(()=>!document.querySelector('.review-persistence button').disabled);}
+    const completedRevisions=new WeakMap();
+    async function complete(target=page){
+      // Observe a new durable transaction, rather than a prior completion label.
+      await target.waitForFunction(previous=>new Promise((resolve,reject)=>{
+        const request=indexedDB.open('devsphere-review-workspace',1);
+        request.onsuccess=()=>{const db=request.result,tx=db.transaction('workspace','readonly'),get=tx.objectStore('workspace').get('current');tx.oncomplete=()=>{db.close();resolve(!!get.result?.revision&&get.result.revision!==previous);};tx.onabort=()=>reject(tx.error);};request.onerror=()=>reject(request.error);
+      }),completedRevisions.get(target)||null);
+      await panel(target).getByText(/이 브라우저에 보관 완료/).waitFor();
+      await target.waitForFunction(()=>!document.querySelector('.review-persistence button').disabled);
+      completedRevisions.set(target,(await stored(target)).revision);
+    }
     await open();const data=savedFixture('comparison');
     // Nothing is persisted without opting in.
     await load('기준','not-opted-in.json',data);assert.equal(await stored(),null);

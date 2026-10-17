@@ -45,5 +45,8 @@ export function useReviewWorkspace(){
       finally{setBusy(false);}
     });await queue.current;
   }
-  return {saved,setSaved,ready,enabled,busy,message,error,blocked,enable,clear,retry:()=>setAttempt(n=>n+1)};
+  // Render pending state with the edit, before the passive save effect runs.
+  // A previous checkpoint's completion must never describe newly edited slots.
+  const pending=ready&&enabled&&!blocked&&!error&&saved!==persisted.current;
+  return {saved,setSaved,ready,enabled,busy:busy||pending,message:pending?'브라우저에 보관 중… 완료 표시를 확인한 뒤 새로고침하세요.':message,error,blocked,enable,clear,retry:()=>setAttempt(n=>n+1)};
 }
