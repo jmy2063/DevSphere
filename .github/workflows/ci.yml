@@ -87,6 +87,7 @@ jobs:
           node tools/run-ui-smoke.cjs snapshot-browser-smoke.cjs
           node tools/run-ui-smoke.cjs review-notes-browser-smoke.cjs
           node tools/run-ui-smoke.cjs review-evidence-browser-smoke.cjs
+          node tools/run-ui-smoke.cjs review-workspace-browser-smoke.cjs
 
       - name: Upload browser evidence
         if: ${{ always() }}

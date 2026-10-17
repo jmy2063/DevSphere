@@ -5,9 +5,9 @@ import {MAX_SNAPSHOT_BYTES,parseSavedReport,savedAnalyses,compareSavedReports} f
 import type {ImpactNode} from '../lib/api';
 import type {ReviewLog} from '../lib/report';
 import ReviewEditor from './ReviewEditor';
+import {useReviewWorkspace} from '../lib/use-review-workspace';
 
 type Side='before'|'after';
-type Saved={name:string;data:ReportData};
 const labels={before:'기준',after:'비교'};
 function download(data:ReportData,format:'json'|'html'){
   const blob=new Blob([format==='html'?buildHtmlReport(data):JSON.stringify(data,null,2)],{type:format==='html'?'text/html;charset=utf-8':'application/json'});
@@ -20,8 +20,9 @@ function Nodes({title,nodes}:{title:string;nodes:ImpactNode[]}){
 }
 
 export default function SavedReviews({getCurrent,available,comparisonKey,onKeyChange}:{getCurrent:()=>ReportData|null;available:boolean;comparisonKey:string;onKeyChange:(value:string)=>void}){
-  const [saved,setSaved]=useState<Record<Side,Saved|null>>({before:null,after:null});
-  const [loading,setLoading]=useState(false),[error,setError]=useState('');
+  const workspace=useReviewWorkspace(),{saved,setSaved}=workspace;
+  const [reading,setLoading]=useState(false),[error,setError]=useState('');
+  const loading=reading||!workspace.ready;
   const [choice,setChoice]=useState(''),[viewer,setViewer]=useState<Side|null>(null);
   const [editor,setEditor]=useState<Side|null>(null);
   const before=saved.before?.data,after=saved.after?.data;
@@ -65,6 +66,14 @@ export default function SavedReviews({getCurrent,available,comparisonKey,onKeyCh
   return <details className="saved-reviews">
     <summary>저장된 JSON 검토·비교</summary>
     <p>서버에 파일을 보내지 않고 저장된 결과를 읽습니다. 현재 분석 세션은 바꾸지 않습니다. 파일당 최대 10MB이며, 불러온 검증 상태는 파일의 기록을 보여줄 뿐 현재 검증한 결과가 아닙니다.</p>
+    <section className="review-persistence" aria-label="검토 자동 보관">
+      <label><input type="checkbox" aria-label="이 브라우저에 검토 자동 보관" checked={workspace.enabled} disabled={!workspace.ready||workspace.busy||workspace.blocked} onChange={e=>{if(e.target.checked)workspace.enable();else void workspace.clear();}}/> 이 브라우저에 검토 자동 보관</label>
+      <p className="review-note">선택하면 기준·비교 결과와 저장한 판단을 이 기기의 브라우저에 보관하고 다음 접속 때 복구합니다. 입력 중인 판단 초안은 기록 저장을 눌러야 반영됩니다. 다른 브라우저·주소에서는 공유되지 않으며, 브라우저 데이터 삭제 시 사라집니다. 공유·백업에는 JSON 저장을 사용하세요.</p>
+      {!workspace.ready&&<p role="status">브라우저 보관본을 확인하고 있습니다…</p>}
+      {workspace.message&&<p role="status">{workspace.message}</p>}
+      {workspace.error&&<p className="saved-error" role="alert">{workspace.error}</p>}
+      <div className="saved-actions"><button className="review-button" disabled={!workspace.ready||workspace.busy} onClick={()=>void workspace.clear()}>브라우저 보관본 지우기</button>{workspace.enabled&&workspace.error&&!workspace.blocked&&<button className="review-button" disabled={workspace.busy} onClick={workspace.retry}>다시 보관</button>}</div>
+    </section>
     <label className="field-label" htmlFor="export-comparison-key">현재 결과에 붙일 프로젝트 비교 키 (선택)</label>
     <input id="export-comparison-key" value={comparisonKey} maxLength={200} onChange={e=>onKeyChange(e.target.value)} placeholder="예: team/my-service · 내보내는 JSON에 포함"/>
     <p className="review-note">다른 업로드끼리 비교할 때는 같은 프로젝트라고 확인한 뒤 양쪽에 같은 키를 지정하세요. 키는 사용자 표기이며 저장소 동일성을 보증하지 않습니다. GitHub 보고서는 저장소·변경 대상도 일치해야 합니다.</p>

@@ -47,10 +47,10 @@ export default function ReviewEditor({report,disabled,onChange}:{report:ReportDa
     const next={analysisKey:analysis.key,nodeId:node.id,decision,reason:reason.trim(),updatedAt:new Date().toISOString()};
     const updated=[...entries.filter(e=>e.analysisKey!==analysis.key||e.nodeId!==node.id),next];
     if(updated.length>2000){setFeedback({key:contextKey,error:'검토 기록은 보고서당 최대 2,000개입니다.',message:''});return;}
-    if(onChange({version:1,reviewer:reviewer.trim(),entries:updated}))setFeedback({key:contextKey,error:'',message:'검토 기록을 반영했습니다. JSON 다시 저장으로 파일에 보관하세요.'});
+    if(onChange({version:1,reviewer:reviewer.trim(),entries:updated}))setFeedback({key:contextKey,error:'',message:'검토 기록을 반영했습니다. JSON 저장 또는 브라우저 자동 보관 완료를 확인하세요.'});
   }
   return <section className="review-editor" aria-label="검토 기록 편집"><h3>검토 판단과 이유</h3>
-    <p className="review-note">선택한 결과의 복사본에 기록합니다. 분석 후보·점수·평가 지표는 바뀌지 않습니다. 검토자 이름은 직접 입력한 표기이며 독립 검수나 테스트 실행을 인증하지 않습니다. 새로고침 전 JSON을 다시 저장하세요.</p>
+    <p className="review-note">선택한 결과의 복사본에 기록합니다. 분석 후보·점수·평가 지표는 바뀌지 않습니다. 검토자 이름은 직접 입력한 표기이며 독립 검수나 테스트 실행을 인증하지 않습니다. 새로고침 전 JSON 저장 또는 브라우저 자동 보관 완료를 확인하세요.</p>
     {!analyses.length?<p>분석된 시작점이 없는 보고서에는 대상별 기록을 남길 수 없습니다.</p>:<fieldset disabled={disabled}>
       <label>검토자 표기 (선택)<input aria-label="검토자 표기" maxLength={100} value={reviewer} onChange={e=>setReviewer(e.target.value)}/></label>
       <label>검토할 분석<select aria-label="검토할 분석" value={analysis?.key||''} onChange={e=>{setKey(e.target.value);setNodeId('');setQuery('');}}>{analyses.map(a=><option key={a.key} value={a.key}>{a.label}</option>)}</select></label>
