@@ -47,7 +47,7 @@ async function main(){
     await editor.getByLabel('검토 판단 이유',{exact:true}).fill('Missing edge evidence');
     await editor.getByRole('button',{name:'기록 저장',exact:true}).click();
     await editor.getByText('이 분석의 저장된 검토 기록 · 2개',{exact:true}).waitFor();
-    await editor.locator('details > summary').click();
+    await editor.getByText('이 분석의 저장된 검토 기록 · 2개',{exact:true}).click();
     await editor.locator('article').filter({hasText:'class:missing'}).getByRole('button',{name:'기록 삭제',exact:true}).click();
     await editor.getByText('이 분석의 저장된 검토 기록 · 1개',{exact:true}).waitFor();
     await editor.getByLabel('검토 판단 이유',{exact:true}).fill('Missing edge evidence');
