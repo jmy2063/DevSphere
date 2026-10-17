@@ -268,7 +268,7 @@ c106886dde77130c88acfe445042b0c56b8a31ea0d114f93a8f932518c2b169d  tools/source-v
 f8c4bc211863ca035a3720b338655105a22988d94e4c8f4e3a56e64464b904de  tools/ts-stubs/globals.d.ts
 9af490036be8513d6276d3bf03dc702593c5d6e056fe54f6ccc51615e3b3e91a  tools/ts-stubs/lucide-react.d.ts
 79f5b07d168c943f518adc1e4422e74acb00cfe7d5962c27bd9d581ee5c2dc91  tools/ts-stubs/react-dom-client.d.ts
-e4de3486e2d42e7c4dae3978dd1b30c60fd8ccfe6bd7ab7d00c23b3554901468  tools/ts-stubs/react.d.ts
+b0284de2460adf1e15adb037ab17950f53e4cd5eb62c9e9ee9675f18e6d086f1  tools/ts-stubs/react.d.ts
 ab007874575d931a54fcf261501c3bf7f2c390250bb7c6254879d904e9c70502  tools/ts-syntax-check.cjs
 506fd5eedcfc676ac524814718398436105ce0df07c728a81810d176466d5bd0  tools/tsconfig.semantic.json
 3c1960430e17342f83444adea86aad78fe5556b8a11c442666f178f341f7e0db  tools/ui-smoke.cjs
