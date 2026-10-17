@@ -54,6 +54,22 @@ async function main(){
     await editor.getByRole('button',{name:'기록 저장',exact:true}).click();
     await editor.getByText('이 분석의 저장된 검토 기록 · 2개',{exact:true}).waitFor();
     await delta.getByText('CRI 42 → 42 (+0) · 변경 시작점 1 → 1개',{exact:true}).waitFor();
+    // Deleting another record must not replace the current unsaved draft after paint.
+    await editor.getByLabel('검토 대상 구분',{exact:true}).selectOption('CANDIDATES');
+    await editor.getByLabel('검토 대상',{exact:true}).selectOption('method:other');
+    const draft='Updated <script>text only</script> - unsaved draft';
+    await editor.getByLabel('검토 판단 이유',{exact:true}).fill(draft);
+    await editor.locator('article').filter({hasText:'class:missing'}).getByRole('button',{name:'기록 삭제',exact:true}).click();
+    await editor.getByText('이 분석의 저장된 검토 기록 · 1개',{exact:true}).waitFor();
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    assert.equal(await editor.getByLabel('검토 판단 이유',{exact:true}).inputValue(),draft);
+    await editor.getByRole('button',{name:'기록 저장',exact:true}).click();
+    await editor.getByLabel('검토 대상 구분',{exact:true}).selectOption('MISSING');
+    await editor.getByLabel('검토 대상',{exact:true}).selectOption('class:missing');
+    assert.equal(await editor.getByLabel('검토 판단 이유',{exact:true}).inputValue(),'');
+    await editor.getByLabel('검토 판단 이유',{exact:true}).fill('Missing edge evidence');
+    await editor.getByRole('button',{name:'기록 저장',exact:true}).click();
+    await editor.getByText('이 분석의 저장된 검토 기록 · 2개',{exact:true}).waitFor();
     assert.deepEqual((await delta.locator('.report-counts b').allTextContents()).filter((_,i)=>i!==3),['0','0','0','0','0']);
     const pending=page.waitForEvent('download');await page.getByRole('button',{name:'검토 기록 포함 JSON 저장',exact:true}).click();
     const jsonFile=path.join(output,'review-notes-snapshot-report.json');await(await pending).saveAs(jsonFile);
