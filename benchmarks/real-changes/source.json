@@ -1,0 +1,15 @@
+{
+  "repository": "https://github.com/spring-projects/spring-petclinic",
+  "license": "Apache-2.0",
+  "base": "0d064b04958da7715a9138459bafbde3bd10949d",
+  "head": "500158f732419217507c7656904b8e6aa1bcc0d6",
+  "patchSha256": "13462355fb2a58717d8c041fe45380f90d4faff888b51343c1ac5007a73e9160",
+  "reviewer": "agent-authored; independent human review pending",
+  "granularity": "two changed production methods from one commit; LOCAL; explicitly labelled API and test-class targets only",
+  "files": [
+    "src/main/java/org/springframework/samples/petclinic/owner/OwnerController.java",
+    "src/main/java/org/springframework/samples/petclinic/vet/VetController.java",
+    "src/test/java/org/springframework/samples/petclinic/owner/OwnerControllerTests.java",
+    "src/test/java/org/springframework/samples/petclinic/vet/VetControllerTests.java"
+  ]
+}

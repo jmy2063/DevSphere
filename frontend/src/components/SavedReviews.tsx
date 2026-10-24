@@ -3,9 +3,11 @@ import {buildHtmlReport,type ReportData} from '../lib/report';
 import {buildSnapshotComparisonHtml} from '../lib/snapshot-report';
 import {MAX_SNAPSHOT_BYTES,parseSavedReport,savedAnalyses,compareSavedReports} from '../lib/snapshots';
 import type {ImpactNode} from '../lib/api';
+import type {ReviewLog} from '../lib/report';
+import ReviewEditor from './ReviewEditor';
+import {useReviewWorkspace} from '../lib/use-review-workspace';
 
 type Side='before'|'after';
-type Saved={name:string;data:ReportData};
 const labels={before:'기준',after:'비교'};
 function download(data:ReportData,format:'json'|'html'){
   const blob=new Blob([format==='html'?buildHtmlReport(data):JSON.stringify(data,null,2)],{type:format==='html'?'text/html;charset=utf-8':'application/json'});
@@ -18,9 +20,11 @@ function Nodes({title,nodes}:{title:string;nodes:ImpactNode[]}){
 }
 
 export default function SavedReviews({getCurrent,available,comparisonKey,onKeyChange}:{getCurrent:()=>ReportData|null;available:boolean;comparisonKey:string;onKeyChange:(value:string)=>void}){
-  const [saved,setSaved]=useState<Record<Side,Saved|null>>({before:null,after:null});
-  const [loading,setLoading]=useState(false),[error,setError]=useState('');
+  const workspace=useReviewWorkspace(),{saved,setSaved}=workspace;
+  const [reading,setLoading]=useState(false),[error,setError]=useState('');
+  const loading=reading||!workspace.ready;
   const [choice,setChoice]=useState(''),[viewer,setViewer]=useState<Side|null>(null);
+  const [editor,setEditor]=useState<Side|null>(null);
   const before=saved.before?.data,after=saved.after?.data;
   const choices=useMemo(()=>before&&after?savedAnalyses(before).filter(a=>savedAnalyses(after).some(b=>b.key===a.key)):[],[before,after]);
   const selected=choices.find(c=>c.key===choice)||choices.find(c=>c.scope==='FEATURE')||choices[0];
@@ -43,6 +47,13 @@ export default function SavedReviews({getCurrent,available,comparisonKey,onKeyCh
     }catch(e){setError(e instanceof Error?e.message:'결과를 보관할 수 없습니다.');}
   }
   function editKey(side:Side,value:string){setSaved(old=>{const target=old[side];return target?{...old,[side]:{...target,data:{...target.data,comparisonKey:value}}}:old;});}
+  function editReview(side:Side,review:ReviewLog):boolean{
+    const record=saved[side];if(!record||loading)return false;
+    setError('');try{
+      const data=parseSavedReport(JSON.stringify({...record.data,review}),record.data.importedAt);
+      setSaved(old=>({...old,[side]:{...record,data}}));return true;
+    }catch(e){setError(e instanceof Error?e.message:'검토 기록을 저장할 수 없습니다.');return false;}
+  }
   function saveComparison(){
     if(!saved.before||!saved.after||!selected)return;
     setError('');
@@ -55,6 +66,14 @@ export default function SavedReviews({getCurrent,available,comparisonKey,onKeyCh
   return <details className="saved-reviews">
     <summary>저장된 JSON 검토·비교</summary>
     <p>서버에 파일을 보내지 않고 저장된 결과를 읽습니다. 현재 분석 세션은 바꾸지 않습니다. 파일당 최대 10MB이며, 불러온 검증 상태는 파일의 기록을 보여줄 뿐 현재 검증한 결과가 아닙니다.</p>
+    <section className="review-persistence" aria-label="검토 자동 보관">
+      <label><input type="checkbox" aria-label="이 브라우저에 검토 자동 보관" checked={workspace.enabled} disabled={!workspace.ready||workspace.busy||workspace.blocked} onChange={e=>{if(e.target.checked)workspace.enable();else void workspace.clear();}}/> 이 브라우저에 검토 자동 보관</label>
+      <p className="review-note">선택하면 기준·비교 결과와 저장한 판단을 이 기기의 브라우저에 보관하고 다음 접속 때 복구합니다. 입력 중인 판단 초안은 기록 저장을 눌러야 반영됩니다. 다른 브라우저·주소에서는 공유되지 않으며, 브라우저 데이터 삭제 시 사라집니다. 공유·백업에는 JSON 저장을 사용하세요.</p>
+      {!workspace.ready&&<p role="status">브라우저 보관본을 확인하고 있습니다…</p>}
+      {workspace.message&&<p role="status">{workspace.message}</p>}
+      {workspace.error&&<p className="saved-error" role="alert">{workspace.error}</p>}
+      <div className="saved-actions"><button className="review-button" disabled={!workspace.ready||workspace.busy} onClick={()=>void workspace.clear()}>브라우저 보관본 지우기</button>{workspace.enabled&&workspace.error&&!workspace.blocked&&<button className="review-button" disabled={workspace.busy} onClick={workspace.retry}>다시 보관</button>}</div>
+    </section>
     <label className="field-label" htmlFor="export-comparison-key">현재 결과에 붙일 프로젝트 비교 키 (선택)</label>
     <input id="export-comparison-key" value={comparisonKey} maxLength={200} onChange={e=>onKeyChange(e.target.value)} placeholder="예: team/my-service · 내보내는 JSON에 포함"/>
     <p className="review-note">다른 업로드끼리 비교할 때는 같은 프로젝트라고 확인한 뒤 양쪽에 같은 키를 지정하세요. 키는 사용자 표기이며 저장소 동일성을 보증하지 않습니다. GitHub 보고서는 저장소·변경 대상도 일치해야 합니다.</p>
@@ -65,12 +84,13 @@ export default function SavedReviews({getCurrent,available,comparisonKey,onKeyCh
       return <article className="saved-slot" key={side} aria-label={`${labels[side]} 스냅샷`}><h3>{labels[side]} 결과</h3>
         <label className="review-button saved-file">{labels[side]} JSON 불러오기<input type="file" accept=".json,application/json" aria-label={`${labels[side]} JSON 불러오기`} disabled={loading} onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)void importFile(side,file);}}/></label>
         <button className="review-button" disabled={!available||loading} onClick={()=>capture(side)}>현재 결과를 {side==='before'?'기준으로':'비교로'} 보관</button>
-        {record&&<><p><b>{record.name}</b><br/>{record.data.project.projectId}<br/>생성 {record.data.generatedAt}</p>
+        {record&&<><p><b>{record.name}</b><br/>{record.data.project.projectId}<br/>생성 {record.data.generatedAt}<br/>검토 기록 {record.data.review?.entries.length||0}개</p>
           <label className="field-label" htmlFor={`saved-key-${side}`}>{labels[side]} 프로젝트 비교 키</label><input id={`saved-key-${side}`} value={record.data.comparisonKey||''} maxLength={200} disabled={loading} onChange={e=>editKey(side,e.target.value)}/>
-          <div className="saved-actions"><button className="review-button" onClick={()=>setViewer(side)}>검토 내용 열기</button><button className="review-button" onClick={()=>download(record.data,'html')}>HTML 저장</button><button className="review-button" onClick={()=>download(record.data,'json')}>JSON 다시 저장</button><button className="review-button" disabled={loading} onClick={()=>{setSaved(old=>({...old,[side]:null}));if(viewer===side)setViewer(null);}}>제거</button></div>
+          <div className="saved-actions"><button className="review-button" disabled={loading} onClick={()=>setEditor(side)}>검토 기록 편집</button><button className="review-button" onClick={()=>setViewer(side)}>검토 내용 열기</button><button className="review-button" onClick={()=>download(record.data,'html')}>HTML 저장</button><button className="review-button" onClick={()=>download(record.data,'json')}>JSON 다시 저장</button><button className="review-button" disabled={loading} onClick={()=>{setSaved(old=>({...old,[side]:null}));if(viewer===side)setViewer(null);if(editor===side)setEditor(null);}}>제거</button></div>
         </>}
       </article>;
     })}</div>
+    {editor&&saved[editor]&&<div><h3>{labels[editor]} 결과 검토</h3><button className="review-button" onClick={()=>setEditor(null)}>검토 편집 닫기</button><ReviewEditor key={`${editor}-${saved[editor]!.data.importedAt}`} report={saved[editor]!.data} disabled={loading} onChange={log=>editReview(editor,log)}/><div className="saved-actions"><button className="review-button" disabled={loading} onClick={()=>download(saved[editor]!.data,'json')}>검토 기록 포함 JSON 저장</button><button className="review-button" disabled={loading} onClick={()=>download(saved[editor]!.data,'html')}>검토 기록 포함 HTML 저장</button></div></div>}
     {delta&&<section className="saved-delta" aria-label="저장 결과 증감 비교"><h3>저장 결과 증감 비교</h3>
       {choices.length>0&&<label>비교할 분석<select aria-label="비교할 분석" value={selected?.key||''} onChange={e=>setChoice(e.target.value)}>{choices.map(c=><option value={c.key} key={c.key}>{c.label}</option>)}</select></label>}
       {delta.error?<p className="saved-error" role="status">{delta.error}</p>:<>

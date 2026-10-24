@@ -1,6 +1,7 @@
 """Fetch only pinned public sources into the task-owned ignored cache. Never rewrites dirty checkouts."""
 import json
-from pathlib import Path
+import hashlib
+from pathlib import Path, PurePosixPath
 import subprocess
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -24,3 +25,27 @@ for entry in SOURCES:
     tree=entry['commit'] if entry['sourceRoot']=='.' else entry['commit']+':'+entry['sourceRoot']
     subprocess.run(['git','-C',str(target),'archive','--format=zip','--output='+str(archive),tree],check=True)
     print(entry['name'],entry['commit'],flush=True)
+
+# Replay the exact upstream patch behind the real-change review, not a hypothetical edit.
+review=ROOT/'benchmarks/real-changes'
+if (review/'source.json').exists():
+    metadata=json.loads((review/'source.json').read_text(encoding='utf-8'))
+    entry=next(s for s in SOURCES if s['commit']==metadata['head'] and s['repository'].removesuffix('.git')==metadata['repository'])
+    target=CACHE/entry['name']
+    base=metadata['base']
+    present=subprocess.run(['git','-C',str(target),'cat-file','-e',base+'^{commit}'],capture_output=True).returncode==0
+    if not present: subprocess.run(['git','-C',str(target),'fetch','--depth','1','origin',base],check=True)
+    header=subprocess.check_output(['git','-C',str(target),'cat-file','-p',metadata['head']]).split(b'\n\n',1)[0]
+    if ('parent '+base).encode('ascii') not in header.splitlines():
+        raise RuntimeError('Review base is not a parent of the pinned change commit')
+    paths=metadata['files']
+    if not paths or any(PurePosixPath(p).is_absolute() or '..' in PurePosixPath(p).parts or '\\' in p for p in paths):
+        raise ValueError('Invalid upstream review paths')
+    changed=subprocess.check_output(['git','-C',str(target),'diff','--no-ext-diff','--no-textconv','--name-only',base,metadata['head']]).decode('utf-8').splitlines()
+    if sorted(changed)!=sorted(paths):
+        raise RuntimeError('Reviewed patch file list is not the whole pinned commit change')
+    patch=subprocess.check_output(['git','-C',str(target),'diff','--no-ext-diff','--no-textconv','--no-color','--unified=3','--src-prefix=a/','--dst-prefix=b/',base,metadata['head'],'--',*paths])
+    expected=(review/'pagination.patch').read_bytes()
+    if patch!=expected or hashlib.sha256(patch).hexdigest()!=metadata['patchSha256']:
+        raise RuntimeError('Reviewed upstream patch differs from pinned before/after source')
+    print('Real change patch verified:',base,'->',metadata['head'],flush=True)

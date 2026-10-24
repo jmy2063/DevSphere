@@ -117,7 +117,10 @@ class SnapshotTests(unittest.TestCase):
     def test_failed_build_keeps_existing_artifacts(self):
         # Everything outside the source repo avoids turning fixture inputs into source.
         with tempfile.TemporaryDirectory() as temporary:
-            work = Path(temporary)
+            # Keep a valid noncanonical spelling: build() resolves executable paths.
+            # This reproduces CI paths whose spelling changes during normalization.
+            (Path(temporary) / "path-alias").mkdir()
+            work = Path(temporary) / "path-alias" / ".."
             for name, data in (("go.exe", b"fake"), ("launcher.exe", b"x" * 100001), ("report.html", b"<html>demo</html>")):
                 (work / name).write_bytes(data)
             output = work / "output"
@@ -125,13 +128,20 @@ class SnapshotTests(unittest.TestCase):
             (output / "DevSphere_AX_Setup.exe").write_bytes(b"existing setup")
             args = SimpleNamespace(source="head", go=work / "go.exe", launcher=work / "launcher.exe", report=work / "report.html", output=output)
             real_output = subprocess.check_output
+            go_version_calls = []
             def fake_go_version(command, **kwargs):
-                return b"go version test windows/amd64" if command == [str(work / "go.exe"), "version"] else real_output(command, **kwargs)
+                if command[1:] == ["version"] and Path(command[0]).resolve() == (work / "go.exe").resolve():
+                    go_version_calls.append(command)
+                    return b"go version test windows/amd64"
+                if command[0] == "git":
+                    return real_output(command, **kwargs)
+                raise AssertionError(f"Unexpected executable in build test: {command[0]}")
             with patch.object(builder, "ROOT", self.root), patch.object(builder.subprocess, "check_output", side_effect=fake_go_version), patch.object(builder, "run", side_effect=RuntimeError("Go test failed")):
                 with self.assertRaisesRegex(RuntimeError, "Go test failed"):
                     builder.build(args)
             self.assertEqual((output / "DevSphere_AX_Setup.exe").read_bytes(), b"existing setup")
             self.assertEqual(len(list(output.iterdir())), 1)
+            self.assertEqual(len(go_version_calls), 1)
             def fail_self_test(*command, **kwargs):
                 if "build" in command:
                     Path(command[command.index("-o") + 1]).write_bytes(b"new setup")
@@ -142,6 +152,7 @@ class SnapshotTests(unittest.TestCase):
                     builder.build(args)
             self.assertEqual((output / "DevSphere_AX_Setup.exe").read_bytes(), b"existing setup")
             self.assertEqual(len(list(output.iterdir())), 1)
+            self.assertEqual(len(go_version_calls), 2)
 
 
 if __name__ == "__main__":

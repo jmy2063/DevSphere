@@ -1,0 +1,8 @@
+# case	expectation	target	evidence-file	evidence-excerpt	reason
+vet-html-redirect	INCLUDE	api:GET:/vets.html	src/main/java/org/springframework/samples/petclinic/vet/VetController.java	return "redirect:/vets.html";	Changed handler redirects this HTML endpoint on invalid page
+vet-html-redirect	INCLUDE	org.springframework.samples.petclinic.vet.VetControllerTests	src/test/java/org/springframework/samples/petclinic/vet/VetControllerTests.java	void showVetListRedirectsOutOfBoundsPageToFirstPage()	Real commit adds invalid-page regression in this test class
+vet-html-redirect	EXCLUDE	api:GET:/vets	src/main/java/org/springframework/samples/petclinic/vet/VetController.java	public @ResponseBody Vets showResourcesVetList()	Separate unchanged JSON handler does not call the changed HTML handler
+owner-search-redirect	INCLUDE	api:GET:/owners	src/main/java/org/springframework/samples/petclinic/owner/OwnerController.java	return "redirect:/owners";	Changed search handler redirects this endpoint on invalid page
+owner-search-redirect	INCLUDE	org.springframework.samples.petclinic.owner.OwnerControllerTests	src/test/java/org/springframework/samples/petclinic/owner/OwnerControllerTests.java	void processFindFormRedirectsOutOfBoundsPageToFirstPage()	Real commit adds search pagination regression in this test class
+owner-search-redirect	EXCLUDE	api:GET:/owners/new	src/main/java/org/springframework/samples/petclinic/owner/OwnerController.java	public String initCreationForm()	Separate creation form does not call changed search handler
+owner-search-redirect	EXCLUDE	api:GET:/owners/find	src/main/java/org/springframework/samples/petclinic/owner/OwnerController.java	public String initFindForm()	Separate static search form does not call changed search handler

@@ -116,3 +116,23 @@ File mapping states are `MAPPED_METHOD`, `CLASS_FALLBACK`, `UNMAPPED`,
 `summary.uniqueImpactNodes` counts the union by Node ID excluding changed starts.
 Tests rank by minimum depth, then confidence, then ID; these are candidates, not executed tests.
 `maxStartRiskScore` is the maximum individual CRI, not an aggregate PR risk score.
+
+## Browser report review records (not a server endpoint)
+
+Saved report JSON (`formatVersion:1`, or the supported legacy report shape) may contain
+`review: {version:1, reviewer:string, entries:[]}`. Each entry contains `analysisKey`,
+`nodeId`, `decision`, `reason`, and `updatedAt`. Keys must match an analysis in that
+report; node IDs must exist in its graph. Decisions are `CONFIRMED`, `EXCLUDED`,
+`NEEDS_REVIEW`, and `MISSING`. The first three refer to predicted candidates;
+`MISSING` refers to graph nodes absent from that analysis's candidates. Changed
+starts and PROJECT/PACKAGE nodes cannot be annotated. Exclusion/missing reasons
+must be nonempty. Entries are unique by analysis key and node ID.
+
+Limits: 2,000 entries per report, 100 characters for the reviewer label, 2,000 for
+each reason, and the existing 10MiB whole-report limit. Unknown review fields are
+discarded; invalid records reject the import while retaining the previous slot.
+The browser editor creates the analysis keys; retain them during JSON round trips.
+These records are user claims, not authenticated reviews, executed tests, or
+Ground Truth. They never modify the graph, CRI, evaluation metrics, or comparison
+delta. HTML report exports include them; comparison HTML includes only records
+for the selected analysis. See [review record workflow](REVIEW_NOTES_2026_10_17.md).

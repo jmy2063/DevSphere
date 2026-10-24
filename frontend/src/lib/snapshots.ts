@@ -81,7 +81,26 @@ export function parseSavedReport(json:string,importedAt=new Date().toISOString()
   const evaluation=root.evaluation==null?null:at(root.evaluation,'evaluation',(o,p):Evaluation=>({changedNode:known(o.changedNode,p),scope:scope(o.scope,p),expectedCount:count(o.expectedCount,p),predictedCount:count(o.predictedCount,p),truePositive:count(o.truePositive,p),falsePositive:count(o.falsePositive,p),falseNegative:count(o.falseNegative,p),precision:num(o.precision,p,0,1),recall:num(o.recall,p,0,1),f1:num(o.f1,p,0,1),topK:num(o.topK,p,1,1000,true),topKRecall:num(o.topKRecall,p,0,1),matched:strings(o.matched,p),missed:strings(o.missed,p),unexpected:strings(o.unexpected,p)}));
   const active=[result,comparison,github].filter(Boolean).length;
   if(active>1||active===0&&!evaluation)fail('분석 결과');
-  return {formatVersion:1,generatedAt:timestamp(root.generatedAt,'generatedAt'),project,result,comparison,github,evaluation,comparisonKey:root.comparisonKey==null?'':text(root.comparisonKey,'comparisonKey',200).trim(),importedAt:timestamp(importedAt,'importedAt')};
+  const report:ReportData={formatVersion:1,generatedAt:timestamp(root.generatedAt,'generatedAt'),project,result,comparison,github,evaluation,comparisonKey:root.comparisonKey==null?'':text(root.comparisonKey,'comparisonKey',200).trim(),importedAt:timestamp(importedAt,'importedAt')};
+  if(root.review!=null){
+    const contexts=new Map(savedAnalyses(report).map(a=>[a.key,{candidates:new Set(a.results.flatMap(r=>[...r.directImpact,...r.indirectImpact].map(n=>n.id))),starts:new Set(a.results.map(r=>r.changedNode))}]));
+    const seen=new Set<string>();
+    report.review=at(root.review,'review',(o,p)=>{
+      if(o.version!==1)fail(`${p}.version`);
+      return {version:1,reviewer:text(o.reviewer,`${p}.reviewer`,100).trim(),entries:rows(o.entries,`${p}.entries`,2000,(v,q)=>at(v,q,(e,r)=>{
+        const analysisKey=text(e.analysisKey,`${r}.analysisKey`,100000),nodeId=known(e.nodeId,`${r}.nodeId`);
+        const decision=text(e.decision,`${r}.decision`),reason=text(e.reason,`${r}.reason`,2000).trim();
+        const context=contexts.get(analysisKey),key=JSON.stringify([analysisKey,nodeId]);
+        if(!context||seen.has(key)||context.starts.has(nodeId)||['PROJECT','PACKAGE'].includes(graph.get(nodeId)!.type))fail(`${r}.검토 대상`);
+        if(!['CONFIRMED','EXCLUDED','NEEDS_REVIEW','MISSING'].includes(decision))fail(`${r}.decision`);
+        if(decision==='MISSING'?context.candidates.has(nodeId):!context.candidates.has(nodeId))fail(`${r}.후보 구분`);
+        if(['EXCLUDED','MISSING'].includes(decision)&&!reason)fail(`${r}.판단 이유`);
+        seen.add(key);
+        return {analysisKey,nodeId,decision:decision as import('./report').ReviewDecision,reason,updatedAt:timestamp(e.updatedAt,`${r}.updatedAt`)};
+      }))};
+    });
+  }
+  return report;
 }
 
 export type SavedAnalysis={key:string;label:string;kind:'NODE'|'PR'|'COMMIT';scope:string;maxDepth:number;starts:string[];results:Impact[];risk:number};
