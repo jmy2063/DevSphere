@@ -85,9 +85,10 @@ export default function App(){
 
   async function analyzeFile(file:File){
     if(busy)return;
-    setBusy(true);setBusyLabel('프로젝트를 분석하고 있습니다…');setError('');clearOutputs();
+    setBusy(true);setBusyLabel('프로젝트를 분석하고 있습니다…');setError('');
     try{
-      const next=await uploadZip(file);setSummary(next);setQuery('');setGroundTruth('');setUploadedRevision('');setReviewProjectKey('');
+      const next=await uploadZip(file);
+      clearOutputs();setSummary(next);setQuery('');setGroundTruth('');setUploadedRevision('');setReviewProjectKey('');
       const first=next.nodes.find(n=>n.type==='SERVICE')?.id||next.nodes.find(n=>n.type==='CONTROLLER')?.id||next.nodes[0]?.id||'';
       setSelected(first);setInspectedNodeId(first);
     }catch(e){setError(messageOf(e))}finally{setBusy(false);setBusyLabel('')}
@@ -163,7 +164,11 @@ export default function App(){
     <section className="top-grid">
       <div className={`panel uploader ${dragging?'dragging':''}`} onDragOver={e=>{e.preventDefault();setDragging(true)}} onDragLeave={()=>setDragging(false)} onDrop={drop}>
         <div className="icon-box"><UploadCloud size={28}/></div><div><h2>1. Spring 프로젝트 업로드</h2><p>{summary?`준비 완료 · ${summary.projectId}`:'Java/Spring 프로젝트 ZIP을 선택하세요. 업로드 후 변경 메서드 또는 PR을 분석할 수 있습니다.'}</p></div>
-        <label className="upload-button">{busy?'처리 중…':summary?'다른 ZIP 선택':'ZIP 선택'}<input type="file" accept=".zip" disabled={busy} onChange={e=>e.target.files?.[0]&&void analyzeFile(e.target.files[0])}/></label>
+        <label className="upload-button">{busy?'처리 중…':summary?'다른 ZIP 선택':'ZIP 선택'}<input type="file" accept=".zip" disabled={busy} onChange={e=>{
+          const file=e.currentTarget.files?.[0];
+          e.currentTarget.value='';
+          if(file)void analyzeFile(file);
+        }}/></label>
       </div>
       {summary?<div className="panel metric-panel"><Metric label="Classes" value={summary.analyzedClasses}/><Metric label="Nodes" value={summary.nodeCount}/><Metric label="Edges" value={summary.edgeCount}/><Metric label="Methods" value={summary.methods}/><Metric label="APIs" value={summary.apis}/><Metric label="Analyze" value={`${summary.analysisDurationMs}ms`}/></div>:<div className="panel metric-empty"><Network size={26}/><b>분석 준비</b><span>ZIP을 업로드하면 프로젝트 구조와 분석 대상을 보여드립니다.</span></div>}
     </section>

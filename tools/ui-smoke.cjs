@@ -36,14 +36,17 @@ async function main(){
     const apiImpact={...systemExtra,depth:3,relation:'EXPOSES',direction:'DOWNSTREAM',endLine:13};
     const apiPath={targetId:'api',targetName:systemExtra.name,targetType:'API',hopCount:1,pathConfidence:.8,steps:[root,systemExtra].map(s=>({...s,endLine:s.line+1,viaRelation:'EXPOSES',direction:'DOWNSTREAM'}))};
     const comparison={LOCAL:{...result,scope:'LOCAL',directImpact:impactNodes.slice(0,1),indirectImpact:[],paths:paths.slice(0,1),riskScore:22,riskLevel:'LOW'},FEATURE:result,SYSTEM:{...result,scope:'SYSTEM',indirectImpact:[...impactNodes.slice(3),apiImpact],paths:[...paths,apiPath],riskScore:72,riskLevel:'HIGH'}};
-    let failImpact=false,reportRequests=0,expectToken=false,largeFixture=false;
+    let failUpload=false,uploadRequests=0,failImpact=false,reportRequests=0,expectToken=false,largeFixture=false;
     const githubReport={kind:'PR',owner:'spring-projects',repo:'spring-petclinic',reference:'42',baseSha:'a'.repeat(40),headSha:'b'.repeat(40),declaredRevision:'',revisionStatus:'UNVERIFIED',mappingSide:'HEAD',warnings:['ZIP 버전 미확인'],files:[{filename:'src/CheckoutService.java',previousFilename:'',changeStatus:'modified',mappingStatus:'MAPPED_METHOD',reason:'HEAD 줄 좌표',startNodeIds:['root']},{filename:'src/Missing.java',previousFilename:'',changeStatus:'removed',mappingStatus:'UNMAPPED',reason:'ZIP에서 해당 파일을 찾지 못했습니다.',startNodeIds:[]}],results:[result],summary:{changedFiles:2,javaFiles:2,methodMappedFiles:1,fallbackFiles:0,unmappedJavaFiles:1,changedStarts:1,uniqueImpactNodes:16,uniqueStructuralNodes:1,maxStartRiskScore:61,tests:[{id:test.id,name:test.name,sourcePath:test.sourcePath,line:8,depth:2,confidence:.9,changedStarts:[root.name]}]}};
     const sourceVerification={status:'VERIFIED',revision:'b'.repeat(40),zipPrefix:'',localFiles:2,repositoryFiles:2,matchedFiles:2,changedFiles:0,missingFiles:0,extraFiles:0,message:'분석 대상 Java 파일 전체의 경로·바이트 내용이 커밋과 일치합니다.',differences:[]};
     await page.route('**/api/**',async route=>{
       const url=new URL(route.request().url());
       let body;
       if(url.pathname==='/api/health')body={status:'UP',service:'fixture',time:'',neo4jConfigured:false};
-      else if(url.pathname.endsWith('/upload')){const shownNodes=largeFixture?[...nodes,...Array.from({length:510},(_,i)=>({id:`large${i}`,name:`Large.method${i}()`,type:'METHOD',sourcePath:'src/Large.java',line:i+1,confidence:.9,attributes:{}}))]:nodes;body={projectId:'fixture',analyzedClasses:2,nodeCount:shownNodes.length,edgeCount:edges.length,analysisDurationMs:12,controllers:0,services:1,repositories:0,entities:0,methods:shownNodes.filter(n=>n.type==='METHOD').length,apis:1,tests:1,nodes:shownNodes,edges,warnings:[]};}
+      else if(url.pathname.endsWith('/upload')){
+        uploadRequests++;
+        if(failUpload)return route.fulfill({status:400,json:{message:'Fixture upload failed'}});
+        const shownNodes=largeFixture?[...nodes,...Array.from({length:510},(_,i)=>({id:`large${i}`,name:`Large.method${i}()`,type:'METHOD',sourcePath:'src/Large.java',line:i+1,confidence:.9,attributes:{}}))]:nodes;body={projectId:'fixture',analyzedClasses:2,nodeCount:shownNodes.length,edgeCount:edges.length,analysisDurationMs:12,controllers:0,services:1,repositories:0,entities:0,methods:shownNodes.filter(n=>n.type==='METHOD').length,apis:1,tests:1,nodes:shownNodes,edges,warnings:[]};}
       else if(url.pathname.endsWith('/impact-comparison'))body=comparison;
       else if(url.pathname.endsWith('/impact')){
         if(failImpact)return route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({message:'Fixture request failed'})});
@@ -120,6 +123,22 @@ async function main(){
     await page.getByRole('region',{name:'선택한 근거 경로'}).getByRole('heading',{name:'Worker.process1()'}).waitFor();
     assert.equal(await page.locator('.result-snapshot').count(),1,'Comparison evidence navigation must preserve the result');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Comparison must fit mobile width');
+    const replacement={name:'replacement.zip',mimeType:'application/zip',buffer:Buffer.from('replacement')};
+    const zipPicker=page.locator('input[type=file][accept=".zip"]');
+    failUpload=true;
+    await zipPicker.setInputFiles(replacement);
+    await page.getByText('Fixture upload failed').waitFor();
+    await page.locator('.compare-delta').first().waitFor();
+    assert.equal(await page.locator('#selected-node').inputValue(),'root');
+    assert.equal(await zipPicker.inputValue(),'','The file input must reset so the browser fires change on retry');
+    failUpload=false;
+    const retry=page.waitForResponse(r=>r.url().endsWith('/upload')&&r.ok());
+    await zipPicker.setInputFiles(replacement);
+    await retry;
+    await page.locator('.result-snapshot').waitFor({state:'hidden'});
+    assert.equal(uploadRequests,3,'The same ZIP must be selectable again after a failed upload');
+    await page.getByRole('button',{name:'3단계 비교'}).click();
+    await page.locator('.compare-delta').first().waitFor();
     failImpact=true;
     await page.getByRole('button',{name:'영향 분석',exact:true}).click();
     await page.getByText('Fixture request failed').waitFor();

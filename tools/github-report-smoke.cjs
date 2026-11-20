@@ -6,7 +6,7 @@ const fs=require('node:fs');const path=require('node:path');
 const root=path.resolve(__dirname,'..');
 const head='f9df3a1ee82d5b6a8b6867a1bac1df5523bf5259';
 async function main(){
-  const browser=await chromium.launch({channel:'chrome',headless:true});let project;
+  const browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL||'chrome',headless:true});let project;
   try{
     const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];
     page.on('pageerror',e=>errors.push(e.message));
