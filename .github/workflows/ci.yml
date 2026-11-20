@@ -89,6 +89,25 @@ jobs:
           node tools/run-ui-smoke.cjs review-evidence-browser-smoke.cjs
           node tools/run-ui-smoke.cjs review-workspace-browser-smoke.cjs
 
+      - name: Browser review and exports with the Spring backend
+        timeout-minutes: 5
+        env:
+          BROWSER_CHANNEL: chromium
+        run: |
+          mkdir -p benchmark-output
+          java -jar backend/build/libs/*-zkd.jar > benchmark-output/backend-smoke.log 2>&1 &
+          backend_pid=$!
+          node frontend/node_modules/vite/bin/vite.js preview frontend --host 127.0.0.1 --port 5173 --strictPort > benchmark-output/frontend-smoke.log 2>&1 &
+          frontend_pid=$!
+          trap 'kill "$backend_pid" "$frontend_pid" 2>/dev/null || true' EXIT
+          if ! curl --fail --silent --show-error --retry 30 --retry-connrefused --retry-delay 1 http://127.0.0.1:8080/api/health ||
+             ! curl --fail --silent --show-error --retry 30 --retry-connrefused --retry-delay 1 http://127.0.0.1:5173/ > /dev/null; then
+            cat benchmark-output/{backend,frontend}-smoke.log
+            exit 1
+          fi
+          node tools/report-live-smoke.cjs
+          node tools/snapshot-live-smoke.cjs
+
       - name: Upload browser evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -97,6 +116,7 @@ jobs:
           path: |
             benchmark-output/*.png
             benchmark-output/*-report.html
+            benchmark-output/*-smoke.log
           if-no-files-found: ignore
           retention-days: 7
 
